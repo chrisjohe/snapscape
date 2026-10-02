@@ -1,0 +1,6 @@
+.DS_Store
+node_modules/
+*.log
+/ToDo.md
+/QA.md
+/AGENTS.md

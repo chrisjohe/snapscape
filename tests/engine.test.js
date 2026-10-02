@@ -1,0 +1,475 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  DIFFICULTIES,
+  pictureGuideCost,
+  score,
+  collectedPoints,
+  achievementProgress,
+  geometry,
+  target,
+  edges,
+  piecePath,
+  placeGroup,
+  returnGroupToTray,
+  validateData,
+  ACHIEVEMENTS,
+  SAMPLE_SNAPSCAPES,
+} from "../engine.js";
+function game(id = "breezy", ratio = 1.5) {
+  const d = DIFFICULTIES.find((d) => d.id === id);
+  return {
+    id: "test-puzzle-123",
+    name: "Test",
+    difficulty: id,
+    ratio,
+    seed: 123,
+    seconds: 0,
+    image: "data:image/jpeg;base64,AAAA",
+    order: Array.from({ length: d.cols * d.rows }, (_, i) => i),
+    pieces: Array(d.cols * d.rows).fill(null),
+    ownPhoto: false,
+    resumed: false,
+  };
+}
+test("every difficulty has complementary neighbors and flat outer edges", () => {
+  for (const d of DIFFICULTIES) {
+    const g = game(d.id);
+    for (let id = 0; id < g.pieces.length; id++) {
+      const e = edges(g, id),
+        c = id % d.cols,
+        r = Math.floor(id / d.cols);
+      if (c < d.cols - 1) assert.equal(e[1], -edges(g, id + 1)[3]);
+      else assert.equal(e[1], 0);
+      if (r < d.rows - 1) assert.equal(e[2], -edges(g, id + d.cols)[0]);
+      else assert.equal(e[2], 0);
+      if (c === 0) assert.equal(e[3], 0);
+      if (r === 0) assert.equal(e[0], 0);
+      assert.ok(!piecePath(g, id).includes("NaN"));
+    }
+  }
+});
+test("a close piece locks exactly and a distant piece stays movable", () => {
+  const g = game();
+  g.pieces[0] = { id: 0, x: 15, y: 12, group: 0, locked: false };
+  placeGroup(g, 0);
+  assert.deepEqual(g.pieces[0], { id: 0, x: 0, y: 0, group: 0, locked: true });
+  g.pieces[3] = { id: 3, x: 140, y: 230, group: 3, locked: false };
+  placeGroup(g, 3);
+  assert.equal(g.pieces[3].locked, false);
+});
+test("neighbor pieces join away from home and then lock as a group", () => {
+  const g = game(),
+    { cw } = geometry(g);
+  g.pieces[0] = { id: 0, x: 75, y: 120, group: 0, locked: false };
+  g.pieces[1] = { id: 1, x: cw + 82, y: 125, group: 1, locked: false };
+  placeGroup(g, 1);
+  assert.equal(g.pieces[0].group, g.pieces[1].group);
+  assert.equal(g.pieces[1].x - g.pieces[0].x, cw);
+  assert.equal(g.pieces[1].locked, false);
+  for (const p of g.pieces.filter(Boolean)) {
+    p.x -= 70;
+    p.y -= 115;
+  }
+  placeGroup(g, 0);
+  assert.ok(g.pieces.filter(Boolean).every((p) => p.locked));
+  assert.deepEqual({ x: g.pieces[1].x, y: g.pieces[1].y }, target(g, 1));
+});
+test("a group snaps into anchored neighbors without moving them", () => {
+  const g = game(),
+    { cw } = geometry(g);
+  g.pieces[0] = { id: 0, x: 0, y: 0, group: 0, locked: true };
+  g.pieces[1] = { id: 1, x: cw + 5, y: 3, group: 1, locked: false };
+  placeGroup(g, 1);
+  assert.equal(g.pieces[1].locked, true);
+  assert.equal(g.pieces[0].x, 0);
+});
+test("all puzzles can be completed in random order including portrait photos", () => {
+  for (const d of DIFFICULTIES)
+    for (const ratio of [1.5, 0.6667, 1, 3]) {
+      const g = game(d.id, ratio);
+      for (const id of [...g.order].sort(
+        (a, b) => ((a * 13) % 97) - ((b * 13) % 97),
+      )) {
+        const t = target(g, id);
+        g.pieces[id] = { id, x: t.x + 1, y: t.y + 1, group: id, locked: false };
+        placeGroup(g, id);
+      }
+      assert.equal(g.pieces.filter((p) => p.locked).length, g.pieces.length);
+    }
+});
+test("a returned piece is available in the tray and survives save/resume", () => {
+  const g = game(),
+    order = [...g.order];
+  g.pieces[3] = { id: 3, x: 140, y: 230, group: 3, locked: false };
+  assert.equal(returnGroupToTray(g, 3), 1);
+  assert.equal(g.pieces[3], null);
+  assert.deepEqual(g.order, order);
+  const restored = validateData(
+    JSON.parse(JSON.stringify({ version: 1, records: [], active: g, revision: "rev" })),
+  ).active;
+  assert.equal(restored.pieces[3], null);
+  assert.deepEqual(restored.order, order);
+  restored.pieces[3] = { id: 3, ...target(restored, 3), group: 3, locked: false };
+  placeGroup(restored, 3);
+  assert.equal(restored.pieces[3].locked, true);
+});
+test("returning a connected group leaves other loose and locked pieces intact", () => {
+  const g = game(),
+    { cw } = geometry(g);
+  g.pieces[0] = { id: 0, x: 75, y: 120, group: 0, locked: false };
+  g.pieces[1] = { id: 1, x: cw + 82, y: 125, group: 1, locked: false };
+  placeGroup(g, 1);
+  g.pieces[5] = { id: 5, x: 300, y: 250, group: 5, locked: false };
+  g.pieces[11] = { id: 11, ...target(g, 11), group: 11, locked: true };
+  const loose = { ...g.pieces[5] },
+    locked = { ...g.pieces[11] };
+  assert.equal(returnGroupToTray(g, 0), 2);
+  assert.equal(g.pieces[0], null);
+  assert.equal(g.pieces[1], null);
+  assert.deepEqual(g.pieces[5], loose);
+  assert.deepEqual(g.pieces[11], locked);
+  assert.deepEqual(
+    validateData({ version: 1, records: [], active: g }).active.pieces,
+    g.pieces,
+  );
+});
+test("locked pieces and pieces already in the tray cannot be returned again", () => {
+  const g = game();
+  g.pieces[0] = { id: 0, ...target(g, 0), group: 0, locked: true };
+  const original = structuredClone(g);
+  assert.equal(returnGroupToTray(g, 0), 0);
+  assert.equal(returnGroupToTray(g, 1), 0);
+  assert.deepEqual(g, original);
+});
+test("bonuses decline in whole points, stop at zero, and never reduce base points", () => {
+  let previous = 0;
+  for (const d of DIFFICULTIES) {
+    assert.ok(d.points > previous);
+    previous = d.points;
+    assert.equal(score(d.id, 0).bonus, Math.round(d.points * 0.5));
+    assert.equal(score(d.id, d.target).bonus, Math.round(d.points * 0.25));
+    assert.equal(score(d.id, d.target * 2).bonus, 0);
+    assert.equal(score(d.id, 1000000).total, d.points);
+  }
+});
+test("Picture guide charges whole points, caps deductions, and forfeits the reward from ten uses", () => {
+  assert.deepEqual(DIFFICULTIES.map((d) => pictureGuideCost(d.id)), [1, 3, 6, 14]);
+  for (const d of DIFFICULTIES) {
+    for (const seconds of [0, d.target, d.target * 2, 1000000]) {
+      const gross = score(d.id, seconds).total;
+      for (let uses = 0; uses < 10; uses++) {
+        const award = score(d.id, seconds, uses);
+        assert.equal(award.guidePenalty, Math.min(gross, uses * pictureGuideCost(d.id)));
+        assert.equal(award.total, Math.max(0, gross - uses * pictureGuideCost(d.id)));
+        assert.equal(award.total + award.guidePenalty, award.base + award.bonus);
+      }
+      for (const uses of [10, 11, 100]) {
+        const award = score(d.id, seconds, uses);
+        assert.equal(award.total, 0);
+        assert.equal(award.guidePenalty, gross);
+      }
+    }
+  }
+});
+test("scores remain whole and nonnegative across times, difficulties, and guide usage", () => {
+  for (const d of DIFFICULTIES) {
+    let previousBonus = Infinity;
+    for (let seconds = 0; seconds <= d.target * 2 + 1; seconds += 0.5) {
+      const bonus = score(d.id, seconds).bonus;
+      assert.ok(bonus <= previousBonus);
+      previousBonus = bonus;
+      for (const uses of [0, 1, 2, 8, 9, 10, 11, Number.MAX_SAFE_INTEGER]) {
+        const award = score(d.id, seconds, uses);
+        assert.ok(Object.values(award).every((points) => Number.isSafeInteger(points) && points >= 0));
+        assert.equal(award.total, award.base + award.bonus - award.guidePenalty);
+      }
+    }
+  }
+  assert.deepEqual(score("snappy", 60, 1), { base: 25, bonus: 11, guidePenalty: 3, total: 33 });
+  assert.deepEqual(score("snappy", 600, 9), { base: 25, bonus: 0, guidePenalty: 25, total: 0 });
+  assert.equal(score("breezy", 23.99).bonus, 5);
+  assert.equal(score("breezy", 24).bonus, 5);
+  assert.equal(score("breezy", 24.01).bonus, 4);
+});
+test("point milestones include whole achievement rewards and cannot fund their own unlock", () => {
+  assert.equal(collectedPoints([{ points: 363 }, { points: 13.8 }, { points: 12.8 }]), 390);
+  for (const [id, target] of [["points", 500], ["points-5000", 1000]]) {
+    const achievement = ACHIEVEMENTS.find((a) => a.id === id);
+    assert.equal(achievement.pointTarget, target);
+    const priorRewards = id === "points" ? 10 : 35;
+    const records = [{ difficulty: "breezy", seconds: 2400, points: target - priorRewards - 1 }];
+    assert.equal(achievementProgress(records).totalPoints, target - 1);
+    assert.equal(achievement.test(records), false);
+    records[0].points = target - priorRewards;
+    assert.equal(achievementProgress(records).totalPoints, target + achievement.points);
+    assert.equal(achievement.test(records), true);
+    records[0].points += 2100;
+    assert.equal(achievement.progress(records), `${target.toLocaleString()} / ${target.toLocaleString()} points`);
+  }
+});
+test("guide usage survives backup roundtrips, missing usage defaults to zero, and invalid usage is rejected", () => {
+  const active = game();
+  const oldRecord = {
+    id: "finished-old-123", name: "Old memory", difficulty: "snappy", seconds: 60,
+    points: score("snappy", 60).total, date: "2026-10-01T12:00:00Z", thumbnail: null,
+  };
+  const legacy = validateData({ version: 1, active, records: [oldRecord] });
+  assert.equal(legacy.active.guideUses, 0);
+  assert.equal(legacy.records[0].guideUses, 0);
+  assert.equal(legacy.records[0].points, oldRecord.points);
+  for (const uses of [1, 9, 10, 11]) {
+    const record = { ...oldRecord, guideUses: uses, points: score("snappy", 60, uses).total };
+    const raw = { version: 1, active: { ...active, guideUses: uses }, records: [record] };
+    const restored = validateData(JSON.parse(JSON.stringify(raw)));
+    assert.equal(restored.active.guideUses, uses);
+    assert.equal(restored.records[0].guideUses, uses);
+    assert.equal(restored.records[0].points, record.points);
+  }
+  for (const guideUses of [-1, 1.5, "1", null, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(() => validateData({ version: 1, active: { ...active, guideUses }, records: [] }));
+    assert.throws(() => validateData({ version: 1, active: null, records: [{ ...oldRecord, guideUses }] }));
+  }
+});
+test("backup validation roundtrips state and rejects malformed records and duplicate IDs", () => {
+  const g = game();
+  const record = {
+    id: "finished-123",
+    name: "Memory",
+    difficulty: "breezy",
+    seconds: 60,
+    points: score("breezy", 60).total,
+    date: "2026-09-28T12:00:00Z",
+    thumbnail: null,
+    resumed: true,
+    ownPhoto: true,
+  };
+  const valid = { version: 1, records: [record], active: g, revision: "rev" };
+  assert.equal(validateData(valid).active.pieces.length, 12);
+  assert.throws(() => validateData({ ...valid, records: [record, record] }));
+  assert.equal(
+    validateData({ ...valid, records: [{ ...record, points: 9999 }] }).records[0].points,
+    score("breezy", 60).total,
+  );
+  assert.throws(() => validateData({ ...valid, records: [{ ...record, difficulty: "unknown" }] }));
+  assert.throws(() =>
+    validateData({ ...valid, active: { ...g, image: "javascript:alert(1)" } }),
+  );
+  assert.throws(() =>
+    validateData({ ...valid, active: { ...g, order: Array(12).fill(0) } }),
+  );
+  assert.throws(() => validateData({ ...valid, active: { ...g, ratio: 0 } }));
+});
+test("achievements are derived from completed puzzles and include resumed and own photos", () => {
+  assert.equal(ACHIEVEMENTS.length, 14);
+  assert.equal(ACHIEVEMENTS.filter((a) => a.test([])).length, 0);
+  const record = {
+    difficulty: "breezy",
+    seconds: 60,
+    points: 138,
+    resumed: true,
+    ownPhoto: true,
+  };
+  const earned = ACHIEVEMENTS.filter((a) => a.test([record])).map((a) => a.id);
+  assert.deepEqual(earned, ["first", "later", "photo", "quick"]);
+});
+
+test("the 25 and 50 puzzle achievements unlock at their thresholds and cap progress", () => {
+  for (const [id, target] of [["twenty-five", 25], ["fifty", 50]]) {
+    const achievement = ACHIEVEMENTS.find((a) => a.id === id);
+    for (const count of [0, 24, 25, 26, 49, 50, 51]) {
+      const records = Array.from({ length: count }, () => ({ difficulty: "breezy", points: 0 }));
+      assert.equal(achievement.test(records), count >= target);
+      assert.equal(achievement.progress(records), `${Math.min(count, target)} / ${target} puzzles`);
+    }
+  }
+});
+
+test("Golden Gator counts earned points after guide deductions and unlocks at exactly 1,000", () => {
+  const achievement = ACHIEVEMENTS.find((a) => a.id === "points-5000");
+  const record = (difficulty, seconds, guideUses = 0) => ({
+    difficulty, seconds, guideUses, points: score(difficulty, seconds, guideUses).total,
+  });
+  const records = [
+    ...Array.from({ length: 4 }, () => record("legend", 0)), record("bold", 2400, 6),
+  ];
+  assert.equal(achievement.test(records), false);
+  assert.equal(achievement.progress(records), `999 / ${(1000).toLocaleString()} points`);
+  records.push(record("breezy", 240, 9));
+  assert.equal(achievement.test(records), true);
+  assert.equal(achievement.progress(records), `${(1000).toLocaleString()} / ${(1000).toLocaleString()} points`);
+  records.at(-1).points--;
+  assert.equal(achievement.test(records), false);
+  records.at(-1).points += 500;
+  assert.equal(achievement.test(records), true);
+  assert.equal(achievement.progress(records), `${(1000).toLocaleString()} / ${(1000).toLocaleString()} points`);
+});
+
+test("achievement rewards are derived once, including zero-point finishes and repeated puzzles", () => {
+  assert.deepEqual(achievementProgress([]), {
+    earned: [], puzzlePoints: 0, achievementPoints: 0, totalPoints: 0,
+  });
+  assert.ok(ACHIEVEMENTS.every((a) => Number.isSafeInteger(a.points) && a.points > 0));
+  const records = [{ difficulty: "breezy", seconds: 60, points: score("breezy", 60).total }];
+  const first = achievementProgress(records);
+  assert.deepEqual(first.earned.map((a) => a.id), ["first", "quick"]);
+  assert.equal(first.achievementPoints, 30);
+  assert.equal(first.totalPoints, 44);
+  assert.deepEqual(achievementProgress(records), first);
+  records.push({ ...records[0] });
+  assert.equal(achievementProgress(records).achievementPoints, 30);
+  assert.equal(achievementProgress(records).totalPoints, 58);
+
+  const guided = achievementProgress([{ ...records[0], guideUses: 10, points: 0 }]);
+  assert.equal(guided.puzzlePoints, 0);
+  assert.equal(guided.achievementPoints, 35);
+  assert.equal(guided.totalPoints, 35);
+});
+
+test("guide bonuses and chained point milestones use the same total without duplicate rewards", () => {
+  const records = [{ difficulty: "breezy", seconds: 2400, points: 485 }];
+  assert.equal(achievementProgress(records).totalPoints, 495);
+  const guided = achievementProgress(records, { guideUsed: true });
+  assert.deepEqual(guided.earned.map((a) => a.id), ["first", "guide", "points"]);
+  assert.equal(guided.totalPoints, 525);
+  assert.ok(ACHIEVEMENTS.find((a) => a.id === "points").test(records, { guideUsed: true }));
+  assert.equal(ACHIEVEMENTS.find((a) => a.id === "points-5000").progress(records, { guideUsed: true }), `525 / ${(1000).toLocaleString()} points`);
+
+  records[0].points = 965;
+  const chained = achievementProgress(records);
+  assert.deepEqual(chained.earned.map((a) => a.id), ["first", "points", "points-5000"]);
+  assert.equal(chained.totalPoints, 1050);
+  assert.equal(chained.achievementPoints, 85);
+});
+
+test("legacy fractional saves and backup restores recalculate whole puzzle and achievement points", () => {
+  const legacy = {
+    version: 1, active: { ...game(), guideUses: 1 },
+    records: [{
+      id: "legacy-finish-123", name: "Memory", difficulty: "breezy", seconds: 60,
+      points: 13.8, date: "2026-10-01T12:00:00Z", thumbnail: null,
+    }],
+  };
+  const restored = validateData(legacy);
+  const progress = achievementProgress(restored.records, restored);
+  assert.equal(restored.records[0].points, 14);
+  assert.equal(progress.achievementPoints, 35);
+  assert.equal(progress.totalPoints, 49);
+  for (let i = 0; i < 3; i++) {
+    const roundtrip = validateData(JSON.parse(JSON.stringify(restored)));
+    assert.deepEqual(achievementProgress(roundtrip.records, roundtrip), progress);
+    assert.equal(roundtrip.records[0].points, 14);
+  }
+});
+
+test("Every Kind of Chomp requires completed puzzles on all four distinct difficulties", () => {
+  const achievement = ACHIEVEMENTS.find((a) => a.id === "all-difficulties");
+  const records = DIFFICULTIES.map(({ id }) => ({ difficulty: id, points: 0 }));
+  assert.equal(achievement.test([]), false);
+  assert.equal(achievement.progress([]), "0 / 4 difficulties");
+  for (const missing of records) {
+    const incomplete = records.filter((r) => r !== missing);
+    const repeated = [...incomplete, ...incomplete, { difficulty: "unknown" }];
+    assert.equal(achievement.test(repeated, { active: missing }), false);
+    assert.equal(achievement.progress(repeated), "3 / 4 difficulties");
+  }
+  assert.equal(achievement.test(records), true);
+  assert.equal(achievement.progress([...records, ...records]), "4 / 4 difficulties");
+});
+
+test("the guide achievement migrates saved usage and keeps a validated lifetime flag", () => {
+  const achievement = ACHIEVEMENTS.find((a) => a.id === "guide");
+  const empty = { version: 1, active: null, records: [] };
+  const legacy = validateData(empty);
+  assert.equal(legacy.guideUsed, false);
+  assert.equal(achievement.test([], legacy), false);
+  const record = {
+    id: "guided-finish-123", name: "A guided puzzle", difficulty: "breezy",
+    seconds: 60, guideUses: 1, points: score("breezy", 60, 1).total,
+    date: "2026-10-01T12:00:00Z", thumbnail: null,
+  };
+  for (const evidence of [
+    { guideUsed: true },
+    { active: { ...game(), guideUses: 1 } },
+    { records: [record] },
+    { records: [record], guideUsed: false },
+  ]) {
+    const restored = validateData({ ...empty, ...evidence });
+    assert.equal(restored.guideUsed, true);
+    assert.equal(achievement.test(restored.records, restored), true);
+    restored.active = null;
+    restored.records = [];
+    const roundtrip = validateData(JSON.parse(JSON.stringify(restored)));
+    assert.equal(achievement.test(roundtrip.records, roundtrip), true);
+  }
+  assert.equal(achievement.test([record]), true);
+  assert.equal(achievement.test([], { active: { guideUses: 1 } }), true);
+  for (const guideUsed of [null, 0, 1, "true", [], {}]) {
+    assert.throws(() => validateData({ ...empty, guideUsed }));
+  }
+});
+
+test("Sunshine Explorer requires every distinct bundled picture, on any difficulty", () => {
+  const explorer = ACHIEVEMENTS.find((a) => a.id === "explorer");
+  assert.equal(explorer.test([]), false);
+  assert.equal(explorer.progress([]), "0 / 12 pictures");
+  for (const level of [null, ...DIFFICULTIES]) {
+    const records = SAMPLE_SNAPSCAPES.map((sampleId, i) => ({
+      sampleId,
+      difficulty: (level || DIFFICULTIES[i % DIFFICULTIES.length]).id,
+      name: "The same edited title",
+      ownPhoto: false,
+      points: 0,
+      thumbnail: null,
+    }));
+    const incomplete = [...records.slice(0, -1), ...records.slice(0, -1)];
+    assert.equal(explorer.test(incomplete), false);
+    assert.equal(explorer.progress(incomplete), "11 / 12 pictures");
+    assert.equal(explorer.test(records), true);
+    assert.equal(explorer.progress([...records, ...records]), "12 / 12 pictures");
+  }
+  const repeated = DIFFICULTIES.map(({ id }) => ({ sampleId: "beach", difficulty: id }));
+  assert.equal(explorer.progress(repeated), "1 / 12 pictures");
+  assert.equal(explorer.test(repeated), false);
+});
+
+test("Sunshine Explorer excludes uploads, unidentified legacy finishes, and unknown pictures", () => {
+  const explorer = ACHIEVEMENTS.find((a) => a.id === "explorer");
+  const records = [
+    ...SAMPLE_SNAPSCAPES.map((sampleId) => ({ sampleId, ownPhoto: true })),
+    ...SAMPLE_SNAPSCAPES.map((name) => ({ name, ownPhoto: false })),
+    { sampleId: "unknown-picture", ownPhoto: false },
+    { sampleId: null, ownPhoto: false },
+  ];
+  assert.equal(explorer.test(records), false);
+  assert.equal(explorer.progress(records), "0 / 12 pictures");
+});
+
+test("sample identities survive backup validation while legacy saves remain readable", () => {
+  const record = {
+    id: "sample-finish-123", name: "Renamed memory", difficulty: "breezy",
+    seconds: 60, points: score("breezy", 60).total,
+    date: "2026-10-01T12:00:00Z", thumbnail: null, ownPhoto: false,
+  };
+  const legacy = validateData({ version: 1, active: game(), records: [record] });
+  assert.equal(legacy.active.sampleId, null);
+  assert.equal(legacy.records[0].sampleId, null);
+  assert.equal(legacy.records[0].points, record.points);
+  for (const sampleId of [null, ...SAMPLE_SNAPSCAPES]) {
+    const raw = {
+      version: 1,
+      active: { ...game(), sampleId },
+      records: [{ ...record, sampleId }],
+    };
+    const restored = validateData(JSON.parse(JSON.stringify(raw)));
+    assert.equal(restored.active.sampleId, sampleId);
+    assert.equal(restored.records[0].sampleId, sampleId);
+  }
+  for (const identity of [
+    ...["unknown-picture", "", 1, true, [], {}].map((sampleId) => ({ sampleId })),
+    { sampleId: "beach", ownPhoto: true },
+  ]) {
+    assert.throws(() => validateData({ version: 1, active: { ...game(), ...identity }, records: [] }));
+    assert.throws(() => validateData({ version: 1, active: null, records: [{ ...record, ...identity }] }));
+  }
+});

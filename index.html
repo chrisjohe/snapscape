@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#143c52" />
+    <meta
+      name="description"
+      content="Turn your favorite photos into jigsaw puzzles. Collect Snap Points, earn achievements, and fill your Trophy Swamp."
+    />
+    <title>Snapscape · A happy little puzzle place</title>
+    <link rel="icon" href="./assets/favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" href="./assets/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="icon" href="./assets/favicon-16.png" type="image/png" sizes="16x16" />
+    <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png" sizes="180x180" />
+    <link rel="stylesheet" href="./styles.css?v=20261002-5" />
+    <script type="module" src="./app.js?v=20261002-9"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to Puzzle Table</a>
+    <header class="site-header">
+      <a class="brand" href="#play" aria-label="Snapscape home"
+        ><img
+          class="brand-logo"
+          src="./assets/mascot.png"
+          alt=""
+          aria-hidden="true"
+          width="44"
+          height="44"
+        />
+        <span class="brand-name">snapscape</span></a
+      >
+      <button
+        id="nav-toggle"
+        class="nav-toggle"
+        aria-label="Open navigation"
+        aria-expanded="false"
+        aria-controls="main-navigation"
+      >
+        <span class="nav-toggle-icon" aria-hidden="true"></span>
+      </button>
+      <nav
+        id="main-navigation"
+        class="main-navigation"
+        aria-label="Main navigation"
+      >
+        <button class="nav-button active" data-view="play" aria-current="page">
+          <span id="play-nav-label">Puzzle Table</span>
+          <span id="play-nav-icon" class="toolbar-icon icon-play" aria-hidden="true" hidden></span></button
+        ><button class="nav-button" data-view="gallery">
+          Trophy Swamp <span id="gallery-count" class="count">0</span></button
+        ><button class="nav-button" data-view="achievements">
+          Chomp Club <span id="achievement-count" class="count">0</span><span class="sr-only"> earned</span>
+        </button>
+      </nav>
+      <div class="header-actions">
+        <button
+          id="help-button"
+          class="header-help"
+          type="button"
+          aria-label="How to play"
+          title="How to play"
+          aria-haspopup="dialog"
+          aria-controls="modal"
+        >
+          <span class="help-icon" aria-hidden="true">?</span>
+          <span class="help-label">How to play</span>
+        </button>
+        <div class="points-total" role="status" aria-label="Snap Points" aria-atomic="true">
+          <span><strong id="total-points">0</strong></span>
+          <img
+            class="points-coin"
+            src="./assets/snap-coin.png"
+            alt=""
+            aria-hidden="true"
+            width="44"
+            height="44"
+          />
+        </div>
+      </div>
+    </header>
+    <main id="main" tabindex="-1">
+      <div id="storage-warning" class="notice" role="status" hidden></div>
+      <section id="play-view" class="view">
+        <div id="setup">
+          <h1 class="sr-only">Make a puzzle</h1>
+          <div class="setup-grid">
+            <section
+              class="setup-step picture-step"
+              aria-labelledby="picture-heading"
+            >
+              <div class="step-heading">
+                <span class="step-number" aria-hidden="true">1</span>
+                <h2 id="picture-heading">
+                  <span class="sr-only">Step 1. </span>Choose a pic for a<br />
+                  <strong>new puzzle</strong>
+                </h2>
+              </div>
+              <div class="upload-zone" id="upload-zone" aria-busy="false">
+                <label class="upload-prompt" id="upload-prompt">
+                  <span class="upload-icon" aria-hidden="true"></span>
+                  <strong>Bring a memory to the table</strong>
+                  <span>Choose a photo, or drop one here</span>
+                  <small class="upload-privacy" id="photo-privacy">
+                    Your photo stays right here in your browser and never leaves your device.
+                  </small>
+                  <input
+                    id="photo-input"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                    aria-label="Choose your puzzle photo"
+                    aria-describedby="photo-privacy"
+                  />
+                </label>
+                <div id="photo-preview" class="photo-preview" hidden>
+                  <svg
+                    id="preview-image"
+                    xmlns="http://www.w3.org/2000/svg"
+                    role="img"
+                    aria-label="Your selected puzzle picture with a loose corner piece"
+                    focusable="false"
+                  ></svg>
+                  <button
+                    id="remove-photo-button"
+                    class="icon-button photo-remove"
+                    type="button"
+                    aria-label="Remove selected photo"
+                    title="Remove photo"
+                    hidden
+                  >
+                    <span class="toolbar-icon icon-delete" aria-hidden="true"></span>
+                  </button>
+                </div>
+                <span id="photo-loading" class="photo-loading" hidden
+                  >Getting your picture ready…</span
+                >
+              </div>
+              <button class="button secondary" id="sample-button" type="button" disabled>
+                <span class="sample-cards" aria-hidden="true">
+                  <span class="sample-card">
+                    <img src="./assets/thumbnails/snapscape-bookstore.jpg" alt="" width="144" height="108" decoding="async" draggable="false" />
+                  </span>
+                  <span class="sample-card">
+                    <img src="./assets/thumbnails/snapscape-beach.jpg" alt="" width="144" height="108" decoding="async" draggable="false" />
+                  </span>
+                  <span class="sample-card">
+                    <img src="./assets/thumbnails/snapscape-oranges.jpg" alt="" width="144" height="108" decoding="async" draggable="false" />
+                  </span>
+                  <span class="sample-card">
+                    <img src="./assets/thumbnails/snapscape-miami.jpg" alt="" width="144" height="108" decoding="async" draggable="false" />
+                  </span>
+                  <span class="sample-card">
+                    <img src="./assets/thumbnails/snapscape-kajak.jpg" alt="" width="144" height="108" decoding="async" draggable="false" />
+                  </span>
+                </span>
+                <span class="sample-label">
+                  <span>Or try a random</span>
+                  <strong>snapscape</strong>
+                </span>
+              </button>
+            </section>
+            <section
+              class="setup-step challenge-step"
+              aria-labelledby="challenge-heading"
+            >
+              <div class="step-heading">
+                <span class="step-number" aria-hidden="true">2</span>
+                <h2 id="challenge-heading">
+                  <span class="sr-only">Step 2. </span>Pick your<br />challenge
+                </h2>
+              </div>
+              <fieldset class="difficulty-fieldset">
+                <legend class="sr-only">Puzzle difficulty</legend>
+                <div id="difficulty-options" class="difficulty-options"></div>
+              </fieldset>
+              <label class="rotation-option" title="coming soon">
+                <input
+                  id="random-rotation"
+                  type="checkbox"
+                  aria-describedby="rotation-coming-soon"
+                  disabled
+                />
+                <span>Randomly rotate puzzle pieces</span>
+              </label>
+              <span id="rotation-coming-soon" class="sr-only">coming soon</span>
+            </section>
+            <section
+              class="setup-step launch-step"
+              aria-labelledby="launch-heading"
+            >
+              <div class="step-heading">
+                <span class="step-number" aria-hidden="true">3</span>
+                <h2 id="launch-heading">
+                  <span class="sr-only">Step 3. </span>Let’s get<br />snapping
+                </h2>
+              </div>
+              <div class="launch-content">
+                <img
+                  class="launch-symbol"
+                  src="./assets/snap-pieces.svg"
+                  alt=""
+                  aria-hidden="true"
+                  width="84"
+                  height="60"
+                />
+                <p id="launch-tagline" class="launch-tagline">A little chomp.<br />A lot of joy.</p>
+                <div id="setup-title" class="setup-title" hidden>
+                  <p id="setup-puzzle-name" class="launch-tagline"></p>
+                  <button
+                    id="edit-setup-name-button"
+                    class="button secondary icon-button"
+                    type="button"
+                    aria-label="Edit puzzle name"
+                    title="Edit puzzle name"
+                    aria-haspopup="dialog"
+                    aria-controls="modal"
+                    disabled
+                  >
+                    <span class="toolbar-icon icon-edit" aria-hidden="true"></span>
+                  </button>
+                </div>
+                <p id="start-hint" class="start-hint" role="status">
+                  Choose a picture to get started.
+                </p>
+                <button
+                  id="start-button"
+                  class="button primary start-button"
+                  aria-describedby="start-hint"
+                  disabled
+                >
+                  Start puzzle <span class="toolbar-icon icon-play" aria-hidden="true"></span>
+                </button>
+              </div>
+              <p class="timing-note">
+                <strong>Your pace. No time limit.</strong>
+                <span>Finish faster for up to 50% extra Snap Points, rounded to whole points.</span>
+              </p>
+            </section>
+          </div>
+        </div>
+        <section id="game" hidden aria-label="Jigsaw puzzle">
+          <div class="game-layout">
+            <div class="table-area">
+              <div class="table-scroll" id="table-scroll">
+                <svg
+                  id="puzzle-board"
+                  role="group"
+                  aria-label="Puzzle Table. Select a piece, use arrow keys to choose a position, then press Enter to place it."
+                  tabindex="0"
+                ></svg>
+              </div>
+              <div id="pause-cover" class="pause-cover" hidden>
+                <img
+                  class="pause-gator"
+                  src="./assets/gator-sunbreak.png"
+                  alt=""
+                  width="640"
+                  height="480"
+                  aria-hidden="true"
+                />
+                <h2>Take a sunshine break.</h2>
+                <p>Your puzzle will be right here.</p>
+                <button id="continue-button" class="button primary">
+                  Keep snapping <span class="toolbar-icon icon-play" aria-hidden="true"></span>
+                </button>
+              </div>
+            </div>
+            <div class="game-sidebar">
+              <div class="game-info">
+                <div class="game-heading">
+                  <h1 id="game-name"></h1>
+                  <button
+                    id="edit-name-button"
+                    class="button secondary icon-button"
+                    type="button"
+                    aria-label="Edit puzzle name"
+                    title="Edit puzzle name"
+                    aria-haspopup="dialog"
+                  >
+                    <span class="toolbar-icon icon-edit" aria-hidden="true"></span>
+                  </button>
+                </div>
+                <div class="game-stats">
+                  <div class="game-stat" role="group" aria-label="Your time">
+                    <span class="stat-icon icon-time" aria-hidden="true"></span>
+                    <strong id="timer" class="stat-value">0:00</strong>
+                  </div>
+                  <button
+                    id="pause-button"
+                    class="button icon-button"
+                    type="button"
+                    aria-label="Pause"
+                    title="Pause"
+                  >
+                    <span class="toolbar-icon icon-pause" aria-hidden="true"></span>
+                  </button>
+                  <div
+                    id="piece-progress"
+                    class="game-stat"
+                    role="progressbar"
+                    aria-label="Pieces home"
+                    aria-valuemin="0"
+                    aria-valuemax="24"
+                    aria-valuenow="0"
+                    aria-valuetext="0 of 24 pieces placed"
+                  >
+                    <strong id="placed-count" class="stat-value">0 / 24</strong>
+                    <svg class="progress-ring" viewBox="0 0 32 32" aria-hidden="true">
+                      <circle class="progress-track" cx="16" cy="16" r="12" />
+                      <circle
+                        id="piece-progress-fill"
+                        class="progress-fill"
+                        cx="16" cy="16" r="12"
+                        pathLength="100"
+                        stroke-dasharray="100"
+                        stroke-dashoffset="100"
+                      />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              <div class="table-tools" role="group" aria-label="Table tools">
+                <button
+                  id="reference-button"
+                  class="button secondary guide-button"
+                  type="button"
+                  aria-pressed="false"
+                  aria-label="Picture guide"
+                  title="Picture guide"
+                >
+                  <span class="toolbar-icon icon-guide" aria-hidden="true"></span>
+                  <span>Picture guide</span>
+                </button>
+                <div class="view-tools" role="group" aria-label="Table view">
+                  <button
+                    id="pan-button"
+                    class="button secondary icon-button"
+                    type="button"
+                    aria-pressed="false"
+                    aria-label="Pan table"
+                    title="Pan table"
+                  >
+                    <span class="toolbar-icon icon-pan" aria-hidden="true"></span>
+                  </button>
+                  <div id="zoom-control" class="zoom-control">
+                    <button
+                      id="zoom-button"
+                      class="button secondary icon-button"
+                      type="button"
+                      aria-label="Zoom: Fit"
+                      title="Zoom: Fit"
+                      aria-expanded="false"
+                      aria-controls="zoom-panel"
+                    >
+                      <span class="toolbar-icon icon-size" aria-hidden="true"></span>
+                    </button>
+                    <div id="zoom-panel" class="zoom-panel" role="group" aria-label="Zoom" hidden>
+                      <button class="button secondary zoom-option" type="button" data-zoom="0.5" aria-pressed="false">50%</button>
+                      <button class="button secondary zoom-option" type="button" data-zoom="0.75" aria-pressed="false">75%</button>
+                      <button class="button secondary zoom-option" type="button" data-zoom="1" aria-pressed="true">Fit</button>
+                      <button class="button secondary zoom-option" type="button" data-zoom="1.25" aria-pressed="false">125%</button>
+                      <button class="button secondary zoom-option" type="button" data-zoom="1.5" aria-pressed="false">150%</button>
+                      <button class="button secondary zoom-option" type="button" data-zoom="2" aria-pressed="false">200%</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <aside class="tray-panel" aria-label="Loose puzzle pieces">
+                <div class="tray-controls">
+                  <button
+                    id="edges-button"
+                    class="filter-button"
+                    type="button"
+                    aria-pressed="false"
+                    aria-controls="piece-tray"
+                    title="Show edge pieces only"
+                  >
+                    <span class="toolbar-icon icon-edges" aria-hidden="true"></span>
+                    Edge pieces
+                  </button>
+                </div>
+                <div class="tray-body">
+                  <div id="piece-tray" class="piece-tray"></div>
+                  <button class="tray-return" id="clear-selection" hidden>
+                    <span>put piece back</span>
+                  </button>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </section>
+      </section>
+      <section id="gallery-view" class="view" hidden>
+        <h1 class="sr-only">The Trophy Swamp</h1>
+        <div
+          id="gallery-content"
+          class="gallery-grid"
+          role="region"
+          aria-label="Completed puzzles"
+        ></div>
+      </section>
+      <section id="achievements-view" class="view" aria-labelledby="achievements-heading" hidden>
+        <h1 id="achievements-heading" class="sr-only">Chomp Club</h1>
+        <div id="achievement-content" class="achievement-grid"></div>
+        <p class="achievement-summary">
+          <span id="achievement-progress"></span> Little wins. Big gator energy.
+        </p>
+      </section>
+    </main>
+    <footer>
+      <span>Made with sunshine ☀️ and a little gator 🐊 spirit.</span>
+      <div class="footer-actions">
+        <div class="footer-options" id="footer-options">
+          <button
+            class="text-button options-toggle"
+            id="options-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="options-panel"
+          >
+            Options <span class="options-chevron" aria-hidden="true"></span>
+          </button>
+          <div id="options-panel" class="options-panel" role="group" aria-labelledby="options-toggle" hidden>
+            <button class="options-action" id="export-button" type="button">Back up memories</button>
+            <button class="options-action" id="import-button" type="button">Restore from backup</button>
+            <button class="options-action options-danger" id="erase-button" type="button" aria-haspopup="dialog" aria-controls="modal">Erase browser storage</button>
+          </div>
+          <input
+            id="import-input"
+            type="file"
+            accept="application/json,.json"
+            hidden
+          />
+        </div>
+        <button class="text-button" id="about-button" type="button" aria-haspopup="dialog" aria-controls="about-dialog">
+          Privacy &amp; About
+        </button>
+      </div>
+    </footer>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <div id="announcement" class="sr-only" aria-live="polite"></div>
+    <dialog id="modal" aria-label="Snapscape message">
+      <button class="icon-button modal-close" id="modal-close" aria-label="Close dialog">
+        ×
+      </button>
+      <div id="modal-content"></div>
+    </dialog>
+    <dialog id="about-dialog" class="about-dialog" aria-labelledby="about-title">
+      <button class="icon-button modal-close" id="about-close" type="button" aria-label="Close Privacy and About">×</button>
+      <h2 id="about-title" tabindex="-1" autofocus>Privacy &amp; About</h2>
+      <p>A personal puzzle project by Christian J. Heinze ©.</p>
+      <p>This is a free, non-commercial hobby project, created for fun and personal learning.</p>
+
+      <section class="about-disclaimer" aria-labelledby="independence-heading">
+        <h3 id="independence-heading">Independent and unofficial</h3>
+        <p><strong>Snapscape is not affiliated with, connected to, endorsed, sponsored, or authorized by any public institution. In particular, it has no association with the University of Florida (UF), the Florida Gators, or the University Athletic Association.</strong></p>
+        <p>Florida references, alligator characters, colors, and themes are creative inspiration and do not imply an institutional or team connection. Names and trademarks belong to their respective owners.</p>
+      </section>
+
+      <section aria-labelledby="project-name-heading">
+        <h3 id="project-name-heading">About the name</h3>
+        <p>The copyright notice covers original code and documentation created for this project. It does not cover the name “snapscape” or third-party material. No exclusive rights to the name “snapscape” are claimed.</p>
+        <p>This project is unrelated to other products, services, or organizations using the same name. Any existing third-party rights remain unaffected.</p>
+      </section>
+
+      <section aria-labelledby="privacy-heading">
+        <h3 id="privacy-heading">Your data &amp; privacy</h3>
+        <p>Snapscape processes your selected photos in this browser and stores resized puzzle images, your unfinished puzzle, finished memories, and points here. The app does not upload your photos or send gameplay analytics. It uses browser storage to remember progress and does not set tracking cookies.</p>
+        <p>Use <strong>Options → Back up memories</strong> to download a copy, or <strong>Options → Erase browser storage</strong> to delete Snapscape’s saved data from this browser. Backups contain your puzzle photos and progress. Your original photo files are not changed.</p>
+        <p>When you visit the GitHub Pages version, GitHub logs visitors’ IP addresses for security purposes. See <a href="https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages#data-collection" target="_blank" rel="noopener noreferrer">GitHub Pages data collection</a> and the <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener noreferrer">GitHub Privacy Statement</a>. Following external links takes you to services with their own privacy practices.</p>
+      </section>
+
+      <section aria-labelledby="license-heading">
+        <h3 id="license-heading">Apache 2.0 license</h3>
+        <p>Snapscape’s source code and documentation are licensed under the Apache License, Version 2.0. You may use, modify, and redistribute them, including commercially, under that license’s terms. When redistributing, include the license, retain required notices, and identify modified files.</p>
+        <p>The author’s non-commercial purpose describes this hobby project and does not limit the uses permitted by the Apache 2.0 license.</p>
+        <p>The software comes without warranties, as described in the license. The license does not grant trademark rights. Read the <a href="./LICENSE.txt" target="_blank" rel="noopener">full Apache 2.0 license</a> and <a href="./NOTICE.txt" target="_blank" rel="noopener">attribution notices</a>.</p>
+      </section>
+
+      <section aria-labelledby="credits-heading">
+        <h3 id="credits-heading">Icons, fonts, and artwork</h3>
+        <p><strong>Google icons.</strong> The interface uses <a href="https://developers.google.com/fonts/docs/material_symbols" target="_blank" rel="noopener noreferrer">Google Material Symbols / Material Design icons</a>, licensed under Apache 2.0. The SVG files are bundled with Snapscape; displaying them does not contact Google.</p>
+        <p><strong>System fonts.</strong> Text uses fonts available on your device, including system sans-serif fonts and Georgia or Times New Roman where available. Snapscape does not bundle font files or load fonts from Google Fonts or another font service.</p>
+        <p><strong>AI-generated images.</strong> The bundled mascot and scene illustrations were generated with AI. They are not official university or team artwork. This notice refers to the supplied artwork, not photos you choose yourself.</p>
+      </section>
+
+      <section aria-labelledby="support-heading">
+        <h3 id="support-heading">Support and source code</h3>
+        <p>For source code, bug reports, and support, visit <a href="https://github.com/chrisjohe/snapscape" target="_blank" rel="noopener noreferrer">Support on GitHub</a>.</p>
+      </section>
+      <button class="button secondary" id="about-done" type="button">Close</button>
+    </dialog>
+    <noscript
+      >Snapscape needs JavaScript enabled to make and save your
+      puzzles.</noscript
+    >
+  </body>
+</html>

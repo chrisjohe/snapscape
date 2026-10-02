@@ -1,0 +1,12 @@
+{
+  "name": "snapscape",
+  "version": "1.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "A sunny, private photo jigsaw game for a gator at heart.",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "start": "python3 -m http.server 4173"
+  }
+}

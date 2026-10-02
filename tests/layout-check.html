@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Snapscape portrait-fit regression check</title>
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Board fit regression check</h1>
+      <p>
+        Geometric test frames using the app’s board styles and viewport sizing.
+      </p>
+      <p>
+        <label
+          >Photo shape
+          <select id="shape">
+            <option value="0.6666666667">Portrait 2:3</option>
+            <option value="0.15">Tall portrait 3:20</option>
+            <option value="1">Square</option>
+            <option value="1.5">Landscape 3:2</option>
+            <option value="7">Panorama 7:1</option>
+          </select></label
+        >
+        <label
+          >Zoom
+          <select id="zoom">
+            <option value="0.5">50%</option>
+            <option value="0.75">75%</option>
+            <option value="1" selected>Fit</option>
+            <option value="1.25">125%</option>
+            <option value="1.5">150%</option>
+            <option value="2">200%</option>
+          </select></label
+        >
+      </p>
+      <p id="result" role="status"></p>
+      <div class="game-layout">
+        <div class="table-area">
+          <div class="table-scroll" id="table-scroll">
+            <svg id="puzzle-board" aria-label="Test puzzle frame">
+              <rect id="frame" fill="#dce7de" stroke="#173f52" stroke-width="5" />
+              <text id="label" text-anchor="middle" font-size="50" fill="#173f52">
+                Full frame
+              </text>
+            </svg>
+          </div>
+        </div>
+        <div class="game-sidebar">
+          <div class="game-info">
+            <div class="game-heading"><h1>Test picture</h1></div>
+            <div class="game-stats">
+              <div class="game-stat"><span class="stat-icon icon-time" aria-hidden="true"></span><strong class="stat-value">0:00</strong></div>
+              <button id="pause-button" class="button icon-button" aria-label="Pause"><span class="toolbar-icon icon-pause" aria-hidden="true"></span></button>
+              <div id="piece-progress" class="game-stat"><strong class="stat-value">0 / 24</strong><svg class="progress-ring" viewBox="0 0 32 32" aria-hidden="true"><circle class="progress-track" cx="16" cy="16" r="12" /></svg></div>
+            </div>
+          </div>
+          <div class="table-tools" aria-label="Table tools">
+            <button class="button secondary guide-button"><span class="toolbar-icon icon-guide" aria-hidden="true"></span><span>Picture guide</span></button>
+            <div class="view-tools">
+              <button class="icon-button" aria-label="Pan table">P</button>
+              <button class="icon-button" aria-label="Zoom">Z</button>
+            </div>
+          </div>
+          <aside class="tray-panel" aria-label="Piece tray">
+            <div class="tray-controls"><button class="filter-button" aria-pressed="false">Edge pieces</button></div>
+            <div class="tray-body"></div>
+          </aside>
+        </div>
+      </div>
+    </main>
+    <script type="module">
+      import { boardViewport, BOARD_MARGIN } from "../engine.js";
+      const $ = (s) => document.querySelector(s);
+      function render() {
+        const h = 900 / Number($("#shape").value),
+          svg = $("#puzzle-board"),
+          zoom = Number($("#zoom").value),
+          table = $("#table-scroll"),
+          layout = $(".game-layout"),
+          area = $(".table-area"),
+          stacked = innerWidth <= 900,
+          availableWidth = area.clientWidth;
+        svg.setAttribute(
+          "viewBox",
+          `${-BOARD_MARGIN} ${-BOARD_MARGIN} ${900 + BOARD_MARGIN * 2} ${h + BOARD_MARGIN * 2}`,
+        );
+        $("#frame").setAttribute("width", 900);
+        $("#frame").setAttribute("height", h);
+        $("#label").setAttribute("x", 450);
+        $("#label").setAttribute("y", h / 2);
+        const size = boardViewport({
+          viewportHeight: window.visualViewport?.height || innerHeight,
+          tableTop: table.getBoundingClientRect().top + scrollY,
+          spaceBelow: stacked
+            ? $(".tray-panel").getBoundingClientRect().height +
+              $(".table-tools").getBoundingClientRect().height +
+              parseFloat(getComputedStyle(layout).rowGap) * 2 + 12
+            : 12,
+          availableWidth: Math.max(1, availableWidth),
+          frameRatio: (900 + BOARD_MARGIN * 2) / (h + BOARD_MARGIN * 2),
+          zoom,
+        });
+        layout.style.setProperty("--table-width", `${size.tableWidth}px`);
+        layout.style.setProperty("--table-height", `${size.tableHeight}px`);
+        svg.style.width = `${size.width * size.scale}px`;
+        svg.style.height = `${size.height * size.scale}px`;
+        svg.style.marginTop = `${Math.max(0, (size.tableHeight - size.height * size.scale) / 2)}px`;
+        if (zoom <= 1) table.scrollTo(0, 0);
+        requestAnimationFrame(() => {
+          const r = table.getBoundingClientRect(),
+            box = $("#frame").getBoundingClientRect(),
+            fits =
+              box.left >= r.left &&
+              box.right <= r.right &&
+              box.top >= r.top &&
+              box.bottom <= r.bottom,
+            scrolls =
+              table.scrollWidth > table.clientWidth + 1 ||
+              table.scrollHeight > table.clientHeight + 1;
+          $("#result").textContent =
+            zoom <= 1
+              ? fits && !scrolls
+                ? "PASS: the entire frame fits, with no table scrolling."
+                : "FAIL: frame is clipped or table scrolls."
+              : scrolls
+                ? "PASS: zoom enlarges the view and permits scrolling."
+                : "FAIL: zoom did not enlarge the view.";
+        });
+      }
+      $("#shape").onchange = render;
+      $("#zoom").onchange = render;
+      window.addEventListener("resize", render);
+      render();
+    </script>
+  </body>
+</html>

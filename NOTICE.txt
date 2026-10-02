@@ -1,0 +1,81 @@
+Snapscape
+Copyright 2026 Christian J. Heinze
+
+This is a free, non-commercial hobby project created for fun and personal
+learning. This description does not restrict uses permitted by Apache 2.0.
+
+The copyright notice covers original code and documentation created for
+this project. It does not cover the name "snapscape" or third-party
+material. No exclusive rights to the name "snapscape" are claimed. This
+project is unrelated to other products, services, or organizations using
+the same name. Any existing third-party rights remain unaffected.
+
+Snapscape source code and documentation are licensed under the Apache
+License, Version 2.0. The complete license is included in LICENSE.txt.
+
+Third-party icons
+-----------------
+This project includes Google Material Symbols / Material Design icons,
+provided by Google under the Apache License, Version 2.0.
+
+Source: https://github.com/google/material-design-icons
+Guide and licensing: https://developers.google.com/fonts/docs/material_symbols
+Upstream license: https://github.com/google/material-design-icons/blob/master/LICENSE
+
+Bundled SVG assets in assets/:
+  auto_stories_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  bolt_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  bookmark_star_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  border_style_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  camera_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  crown_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  delete_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  done_all_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  drag_pan_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  edit_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  explore_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  extension_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  frame_inspect_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  grid_guides_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  leaderboard_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  pause_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  pediatrics_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  play_arrow_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  preview_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  save_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  school_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  social_leaderboard_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  star_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  stars_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  support_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  timer_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  trophy_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  upload_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  verified_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  waving_hand_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+
+These icons are served locally and styled with CSS masks. The full Apache
+2.0 license covering them is included in LICENSE.txt.
+
+Fonts
+-----
+Snapscape uses fonts available on the user's device through a system-font
+stack, Georgia, Times New Roman, and generic sans-serif/serif fallbacks.
+No font files are bundled or redistributed, and no external font service
+is used.
+
+Artwork
+-------
+The bundled mascot, challenge portraits, sunshine-break and gallery
+illustrations, and Snap Points coin were generated with AI.
+Generation details are in assets/ARTWORK.md. This notice does not describe
+user-selected photos.
+
+Independence
+------------
+Snapscape is an independent personal project. It is not affiliated with,
+connected to, endorsed, sponsored, or authorized by any public institution,
+the University of Florida (UF), the Florida Gators, or the University
+Athletic Association. References, alligator characters, colors, and themes
+do not imply an institutional or team connection. Names and trademarks
+belong to their respective owners.
