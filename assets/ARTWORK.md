@@ -67,6 +67,21 @@ Input image 1 is the edit target, a seated friendly green alligator with an oran
 Replace ONLY the checkerboard behind and around the character with a perfectly plain solid white background, exact RGB 255,255,255 / #FFFFFF. White in every empty gap too, including under the upper jaw, around the tail and between the arms and body. Absolutely no checkerboard, no transparency visualization, no gray, no paper texture on the background, no shadow, no floor, no gradient. The white background must be completely flat and uniform.
 Preserve the exact character and held puzzle, entire silhouette, face, pose, paws, tail, colors, orange scarf and the fine cut-paper texture INSIDE the character. Do not change the gator at all. Keep the full square composition and all margins. Output one PNG on pure flat white.
 
+## Picture Guide companion — `gator-peek.png`
+
+Generated with the built-in image-generation tool on 2 October 2026, using `mascot.png` as the character and style reference. Saved as a 480 × 480 transparent PNG using macOS `sips`, preserving the generated alpha channel. Displayed at 160 × 160 CSS pixels in the Picture Guide confirmation dialog; decorative and hidden from assistive technology.
+
+Final prompt:
+
+Use case: illustration-story.
+Asset type: one transparent PNG cutout mascot portrait for the Picture Guide confirmation dialog in the Snapscape puzzle game.
+Input image 1: strict character identity and illustration-style reference, not an edit target.
+Primary request: create a new curious, playfully peeking pose of this exact friendly alligator. Head slightly tilted, eyebrows lifted, bright inquisitive eyes glancing ahead, a gentle toothy smile, and one hand raised above the eyes like a little visor as if trying to get a better peek. The other hand rests naturally near the chest. Make the curious expression immediately readable.
+Style/medium: match the reference's charming editorial cut-paper illustration, layered rounded shapes, fine tactile paper grain and soft shading. Preserve its recognizable rounded long muzzle, forest-green skin, cream cheeks and belly, big expressive eyes and orange neckerchief.
+Composition/framing: compact centered square head-and-chest portrait, entire head, snout, raised hand, scarf and torso silhouette visible with a small safe transparent margin. Readable at 160 pixels.
+Scene/backdrop: genuinely transparent background with alpha; no background pattern, matte, scenery, floor, frame or cast shadow.
+Constraints: one character only; no text, letters, logos, watermark, accessories, puzzle pieces, extra limbs or props. Output one finished image.
+
 ## Mascot prompt
 
 Use case: illustration-story. Asset type: browser jigsaw game mascot, transparent PNG cutout. A friendly charming alligator mascot, chest-up three-quarter view, wearing a little orange neckerchief. Editorial cut-paper illustration, original expressive design, rich forest green with subtle tactile paper texture. Compact square composition; large simple readable face and toothy smile, clear silhouette readable at 64px; entire chest-up mascot fully visible with comfortable transparent margin. Warm, playful, welcoming. Genuinely transparent background with alpha; no scenery, text, logos, or watermark. One asset only.

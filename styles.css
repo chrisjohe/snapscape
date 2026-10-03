@@ -709,7 +709,9 @@ input[type="text"] {
   color: var(--muted);
 }
 .difficulty-points,
-.rotation-points {
+.rotation-points,
+.picture-guide-points,
+.achievement-points {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -1920,11 +1922,17 @@ main:has(#game:not([hidden])) {
 .achievement-reward {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
   margin: 0 0 16px;
   font-size: 13px;
   line-height: 1.5;
   font-weight: 700;
+}
+.achievement-points {
+  padding: 5px 9px;
+  font-size: 13px;
 }
 .unlocked .achievement-status {
   padding: 0 11px;
@@ -2010,8 +2018,38 @@ dialog::backdrop {
   color: var(--muted);
   font-size: 15px;
 }
-#modal-content .button {
-  margin: 16px 8px 0 0;
+.dialog-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+.dialog-actions .button {
+  max-width: 100%;
+  margin: 0;
+}
+.picture-guide-dialog {
+  text-align: center;
+}
+.picture-guide-mascot {
+  display: block;
+  width: 160px;
+  height: 160px;
+  max-width: 100%;
+  margin: 0 auto;
+  object-fit: contain;
+}
+.picture-guide-cost {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.picture-guide-points {
+  padding: 5px 9px;
+  font-size: 14px;
 }
 .about-dialog {
   max-width: min(680px, calc(100vw - 28px));
@@ -2051,9 +2089,6 @@ dialog::backdrop {
 }
 .about-disclaimer p:last-child {
   margin-bottom: 0;
-}
-.about-dialog > .button {
-  margin-top: 16px;
 }
 .win {
   text-align: center;
@@ -2275,13 +2310,6 @@ dialog:has(.win) {
   margin: 0;
   font: 13px / 1.2 Georgia, "Times New Roman", serif;
   text-wrap: balance;
-}
-.win-actions {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 24px;
 }
 #modal-content .win-actions .button {
   flex: 1 1 220px;

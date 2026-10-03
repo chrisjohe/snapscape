@@ -1047,7 +1047,7 @@ test("achievement details flip independently, dismiss with Escape, and preserve 
   for (const [i, [html]] of markup.entries()) {
     const [front, back] = html.split('<div class="achievement-face achievement-back"');
     assert.doesNotMatch(front, /achievement-reward|snap-coin\.png/);
-    assert.ok(back.includes(`<span class="achievement-reward"><span>+${engine.ACHIEVEMENTS[i].points.toLocaleString()}</span>`));
+    assert.ok(back.includes(`<span class="achievement-reward"><span class="achievement-points"><span>+${engine.ACHIEVEMENTS[i].points.toLocaleString()}</span>`));
     assert.match(back, /<img class="achievement-coin" src="\.\/assets\/snap-coin\.png" alt="Snap Points" width="20" height="20">/);
     assert.ok(back.includes(`<span>${html.includes("achievement-card unlocked") ? "earned" : "on unlock"}</span>`));
   }
@@ -1321,7 +1321,7 @@ test("Twist guide costs, completed rewards, gallery and backup restores agree", 
   startTwist(a, "snappy");
   await a.node("#reference-button").click();
   assert.match(a.node("#modal-content").innerHTML, /6 Snap Points/);
-  assert.match(a.node("#modal-content").innerHTML, /doubled for Twist/);
+  assert.match(a.node("#modal-content").innerHTML, /−6<\/span>/);
   await a.node("#confirm-guide").click();
   a.run('elapsed = 60; runStart = performance.now(); prepareImage = async () => ({ image: "data:image/jpeg;base64,AAAA" });');
   await a.run("completeGame();");

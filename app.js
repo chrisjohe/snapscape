@@ -424,7 +424,7 @@ function confirmNew() {
   if (!selectedPhoto || photoLoading) return;
   if (data.active) {
     modal(
-      '<p class="eyebrow">A FRESH TABLE</p><h2>Start a new puzzle?</h2><p>This will replace your unfinished puzzle. Your Trophy Swamp and points will stay safe.</p><button id="confirm-new" class="button primary">Start a new puzzle</button><button id="keep-old" class="button secondary">Keep my saved puzzle</button>',
+      '<p class="eyebrow">A FRESH TABLE</p><h2>Start a new puzzle?</h2><p>This will replace your unfinished puzzle. Your Trophy Swamp and points will stay safe.</p><div class="dialog-actions"><button id="confirm-new" class="button primary">Start a new puzzle</button><button id="keep-old" class="button secondary">Keep my saved puzzle</button></div>',
     );
     $("#confirm-new").onclick = () => {
       closeModal();
@@ -506,7 +506,7 @@ function resumeSavedGame() {
 }
 function editPuzzleName(name, onSave) {
   modal(
-    '<h2>Edit puzzle name</h2><form id="rename-form"><label class="field-label" for="rename-input">Puzzle name</label><input id="rename-input" type="text" maxlength="60" required><button class="button primary" type="submit">Save name</button><button class="button secondary" id="cancel-rename" type="button">Cancel</button></form>',
+    '<h2>Edit puzzle name</h2><form id="rename-form"><label class="field-label" for="rename-input">Puzzle name</label><input id="rename-input" type="text" maxlength="60" required><div class="dialog-actions"><button class="button primary" type="submit">Save name</button><button class="button secondary" id="cancel-rename" type="button">Cancel</button></div></form>',
   );
   const input = $("#rename-input");
   input.value = name;
@@ -912,7 +912,17 @@ $("#reference-button").addEventListener("click", () => {
   const cost = pictureGuideCost(game.difficulty, game.twist).toLocaleString();
   let confirmed = false;
   modal(
-    `<h2>A little peek?</h2><p>Each use of Picture guide deducts <strong>${cost} Snap Points</strong> from this puzzle’s reward: 10% of the difficulty’s base points, rounded to the nearest whole point${game.twist ? ", then doubled for Twist" : ""}.</p><p>The preview disappears when you move or rotate a puzzle piece. Showing it again costs another ${cost} points. The reward cannot drop below zero.</p><p><strong>After 10 uses, this puzzle earns no points, including any time bonus.</strong> Points already earned in the Trophy Swamp stay yours.</p><button id="confirm-guide" class="button primary" type="button">Use Picture guide</button><button id="cancel-guide" class="button secondary" type="button">Keep puzzling</button>`,
+    `<div class="picture-guide-dialog">
+      <img class="picture-guide-mascot" src="./assets/gator-peek.png" alt="" width="160" height="160" aria-hidden="true">
+      <h2 id="picture-guide-title">A little peek?</h2>
+      <p class="picture-guide-cost">Each use <span class="picture-guide-points"><span class="sr-only">${cost} Snap Points deducted</span><span aria-hidden="true">−${cost}</span><img class="difficulty-coin" src="./assets/snap-coin.png" alt="" width="18" height="18" aria-hidden="true"></span></p>
+      <p>Disappears with your next move.</p>
+      <div class="dialog-actions">
+        <button id="confirm-guide" class="button primary" type="button">Use Picture guide</button>
+        <button id="cancel-guide" class="button secondary" type="button">Keep puzzling</button>
+      </div>
+    </div>`,
+    "picture-guide-title",
   );
   $("#modal").addEventListener("close", () => {
     if (game !== previewGame || data.active !== previewGame) return;
@@ -1275,7 +1285,7 @@ function showCompletion({ completed, award, unlocks, achievementBonus, totalAwar
           </div>
         </article>`).join("")}</div>
       </section>` : ""}
-      <div class="win-actions">
+      <div class="dialog-actions win-actions">
         <button class="button primary" id="play-again" type="button">One more puzzle <span aria-hidden="true">→</span></button>
         <button class="button secondary" id="see-trophy" type="button">Visit the Trophy Swamp</button>
       </div>
@@ -1420,7 +1430,7 @@ function renderAchievements(progress = achievementProgress(data.records, data)) 
         </div>
         <div class="achievement-face achievement-back" id="achievement-${a.id}-details" aria-hidden="true">
           <p class="achievement-description">${safe(a.description)}</p>
-          <span class="achievement-reward"><span>+${a.points.toLocaleString()}</span> <img class="achievement-coin" src="./assets/snap-coin.png" alt="Snap Points" width="20" height="20"> <span>${unlocked ? "earned" : "on unlock"}</span></span>
+          <span class="achievement-reward"><span class="achievement-points"><span>+${a.points.toLocaleString()}</span> <img class="achievement-coin" src="./assets/snap-coin.png" alt="Snap Points" width="20" height="20"></span> <span>${unlocked ? "earned" : "on unlock"}</span></span>
           <div class="achievement-attainment">
             <span class="achievement-detail-label">${unlocked ? "Complete" : "Progress"}</span>
             <p>${unlocked ? "✓ Earned" : safe(a.progress(data.records, data))}</p>
@@ -1539,7 +1549,7 @@ $("#import-input").addEventListener("change", async (e) => {
     if (game) pause();
     if (token !== importToken) return;
     modal(
-      `<p class="eyebrow">WELCOME BACK, MEMORIES</p><h2>Restore this backup?</h2><p>This backup has ${imported.records.length} finished puzzles${imported.active ? " and an unfinished puzzle" : ""}. Restoring will replace the memories currently saved in this browser. Back up your current memories first if you want to keep them.</p><button class="button primary" id="confirm-import">Restore backup</button><button class="button secondary" id="cancel-import">Cancel</button>`,
+      `<p class="eyebrow">WELCOME BACK, MEMORIES</p><h2>Restore this backup?</h2><p>This backup has ${imported.records.length} finished puzzles${imported.active ? " and an unfinished puzzle" : ""}. Restoring will replace the memories currently saved in this browser. Back up your current memories first if you want to keep them.</p><div class="dialog-actions"><button class="button primary" id="confirm-import">Restore backup</button><button class="button secondary" id="cancel-import">Cancel</button></div>`,
     );
     $("#cancel-import").onclick = closeModal;
     $("#confirm-import").onclick = () => {
@@ -1604,7 +1614,7 @@ $("#erase-button").addEventListener("click", () => {
   ++importToken;
   if (game) pause();
   modal(
-    '<h2>Erase Snapscape data?</h2><p>This permanently deletes your saved puzzle, Trophy Swamp, Snap Points, achievements, and saved photos from Snapscape in this browser.</p><p>Back up your memories first if you want to keep them. Your downloaded backups and original photo files will stay safe.</p><p id="erase-error" role="alert" hidden></p><button class="button secondary" id="cancel-erase" type="button">Cancel</button><button class="button danger" id="confirm-erase" type="button">Erase Snapscape data</button>',
+    '<h2>Erase Snapscape data?</h2><p>This permanently deletes your saved puzzle, Trophy Swamp, Snap Points, achievements, and saved photos from Snapscape in this browser.</p><p>Back up your memories first if you want to keep them. Your downloaded backups and original photo files will stay safe.</p><p id="erase-error" role="alert" hidden></p><div class="dialog-actions"><button class="button secondary" id="cancel-erase" type="button">Cancel</button><button class="button danger" id="confirm-erase" type="button">Erase Snapscape data</button></div>',
   );
   $("#cancel-erase").onclick = closeModal;
   $("#confirm-erase").onclick = () => {
