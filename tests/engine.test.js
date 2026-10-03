@@ -556,7 +556,8 @@ test("the guide achievement migrates saved usage and keeps a validated lifetime 
 test("Sunshine Explorer requires every distinct bundled picture, on any difficulty", () => {
   const explorer = ACHIEVEMENTS.find((a) => a.id === "explorer");
   assert.equal(explorer.test([]), false);
-  assert.equal(explorer.progress([]), "0 / 12 pictures");
+  assert.equal(explorer.description, "Finish all 15 included pictures. Soak up the sunshine.");
+  assert.equal(explorer.progress([]), "0 / 15 pictures");
   for (const level of [null, ...DIFFICULTIES]) {
     const records = SAMPLE_SNAPSCAPES.map((sampleId, i) => ({
       sampleId,
@@ -568,13 +569,29 @@ test("Sunshine Explorer requires every distinct bundled picture, on any difficul
     }));
     const incomplete = [...records.slice(0, -1), ...records.slice(0, -1)];
     assert.equal(explorer.test(incomplete), false);
-    assert.equal(explorer.progress(incomplete), "11 / 12 pictures");
+    assert.equal(explorer.progress(incomplete), "14 / 15 pictures");
     assert.equal(explorer.test(records), true);
-    assert.equal(explorer.progress([...records, ...records]), "12 / 12 pictures");
+    assert.equal(explorer.progress([...records, ...records]), "15 / 15 pictures");
   }
   const repeated = DIFFICULTIES.map(({ id }) => ({ sampleId: "beach", difficulty: id }));
-  assert.equal(explorer.progress(repeated), "1 / 12 pictures");
+  assert.equal(explorer.progress(repeated), "1 / 15 pictures");
   assert.equal(explorer.test(repeated), false);
+});
+
+test("Sunshine Explorer keeps the original twelve finishes and requires each new picture", () => {
+  const explorer = ACHIEVEMENTS.find((a) => a.id === "explorer");
+  const records = [
+    "beach", "bike", "bookstore", "diner", "fishing", "football",
+    "interstate-95", "kajak", "mall", "miami", "oranges", "st-augustine",
+  ].map((sampleId) => ({ sampleId, ownPhoto: false }));
+  assert.equal(explorer.progress(records), "12 / 15 pictures");
+  assert.equal(explorer.test(records), false);
+  for (const sampleId of ["lecture", "tennis", "gymnastics"]) {
+    records.push({ sampleId, ownPhoto: false });
+    assert.equal(explorer.progress(records), `${records.length} / 15 pictures`);
+    assert.equal(explorer.test(records), records.length === 15);
+  }
+  assert.equal(explorer.points, 100);
 });
 
 test("Sunshine Explorer excludes uploads, unidentified legacy finishes, and unknown pictures", () => {
@@ -586,7 +603,7 @@ test("Sunshine Explorer excludes uploads, unidentified legacy finishes, and unkn
     { sampleId: null, ownPhoto: false },
   ];
   assert.equal(explorer.test(records), false);
-  assert.equal(explorer.progress(records), "0 / 12 pictures");
+  assert.equal(explorer.progress(records), "0 / 15 pictures");
 });
 
 test("sample identities survive backup validation while legacy saves remain readable", () => {

@@ -1092,7 +1092,7 @@ test("a random picture keeps its identity through renaming, resume, completion, 
   await a.node("#start-button").click();
   assert.equal(JSON.parse(a.storage.get(KEY)).active.sampleId, sampleId);
   const explorer = engine.ACHIEVEMENTS.find((entry) => entry.id === "explorer");
-  assert.equal(explorer.progress(JSON.parse(a.storage.get(KEY)).records), "0 / 12 pictures");
+  assert.equal(explorer.progress(JSON.parse(a.storage.get(KEY)).records), "0 / 15 pictures");
 
   const resumed = app(a.storage);
   resumed.run(`resumeSavedGame();
@@ -1103,7 +1103,7 @@ test("a random picture keeps its identity through renaming, resume, completion, 
   const completed = JSON.parse(resumed.storage.get(KEY));
   assert.equal(completed.records[0].sampleId, sampleId);
   assert.equal(completed.records[0].name, "A completely different name");
-  assert.equal(explorer.progress(completed.records), "1 / 12 pictures");
+  assert.equal(explorer.progress(completed.records), "1 / 15 pictures");
 
   await resumed.node("#export-button").click();
   const backup = await resumed.blobs.at(-1).text();
@@ -1114,8 +1114,8 @@ test("a random picture keeps its identity through renaming, resume, completion, 
   await restored.node("#confirm-import").click();
   const imported = JSON.parse(restored.storage.get(KEY));
   assert.equal(imported.records[0].sampleId, sampleId);
-  assert.equal(explorer.progress(imported.records), "1 / 12 pictures");
-  assert.match(restored.node("#achievement-content").innerHTML, /1 \/ 12 pictures/);
+  assert.equal(explorer.progress(imported.records), "1 / 15 pictures");
+  assert.match(restored.node("#achievement-content").innerHTML, /1 \/ 15 pictures/);
   assert.match(restored.node("#achievement-progress").innerHTML, /of 20 achievements earned/);
 });
 
@@ -1133,10 +1133,10 @@ test("replacing a sample with an upload clears its identity even when the filena
   await a.run("completeGame();");
   const records = JSON.parse(a.storage.get(KEY)).records;
   assert.equal(records[0].sampleId, null);
-  assert.equal(engine.ACHIEVEMENTS.find((entry) => entry.id === "explorer").progress(records), "0 / 12 pictures");
+  assert.equal(engine.ACHIEVEMENTS.find((entry) => entry.id === "explorer").progress(records), "0 / 15 pictures");
 });
 
-test("the twelfth distinct picture unlocks Sunshine Explorer and a replay does not unlock it again", async () => {
+test("the fifteenth distinct picture unlocks Sunshine Explorer and a replay does not unlock it again", async () => {
   const saved = savedProgress();
   saved.records = engine.SAMPLE_SNAPSCAPES.slice(0, -1).map((sampleId, i) => {
     const level = engine.DIFFICULTIES[i % engine.DIFFICULTIES.length];
@@ -1150,7 +1150,7 @@ test("the twelfth distinct picture unlocks Sunshine Explorer and a replay does n
   saved.active.ownPhoto = false;
   const a = app(new Map([[KEY, JSON.stringify(saved)]]));
   const previousCount = Number(a.node("#achievement-count").textContent);
-  assert.match(a.node("#achievement-content").innerHTML, /11 \/ 12 pictures/);
+  assert.match(a.node("#achievement-content").innerHTML, /14 \/ 15 pictures/);
   a.run(`game = data.active; elapsed = 60;
     game.pieces = game.pieces.map((_, id) => ({ id, group: id, ...target(game, id), locked: true }));
     prepareImage = async () => ({ image: "data:image/jpeg;base64,AAAA" });`);
@@ -1167,7 +1167,7 @@ test("the twelfth distinct picture unlocks Sunshine Explorer and a replay does n
   await a.run("completeGame();");
   assert.doesNotMatch(a.node("#modal-content").innerHTML, /Sunshine Explorer/);
   assert.equal(Number(a.node("#achievement-count").textContent), previousCount + 1);
-  assert.equal(JSON.parse(a.storage.get(KEY)).records.length, 13);
+  assert.equal(JSON.parse(a.storage.get(KEY)).records.length, 16);
 });
 
 test("the first guide achievement unlocks immediately, survives replacement and backup, and resets on erase", async () => {

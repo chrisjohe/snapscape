@@ -5,3 +5,4 @@ node_modules/
 /QA.md
 /TESTS.md
 /AGENTS.md
+/assets/*prompts*.txt

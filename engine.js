@@ -19,12 +19,15 @@ export const SAMPLE_SNAPSCAPES = [
   "diner",
   "fishing",
   "football",
+  "gymnastics",
   "interstate-95",
   "kajak",
+  "lecture",
   "mall",
   "miami",
   "oranges",
   "st-augustine",
+  "tennis",
 ];
 export const BOARD_MARGIN = 8;
 export function boardViewport({

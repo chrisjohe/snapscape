@@ -4,7 +4,7 @@ Generated with the built-in image-generation tool for this project. The mascot i
 
 ## Random snapscapes — supplied picture collection
 
-Added to the random picture selection on 1 October 2026. These twelve supplied PNGs replace `florida-sunshine.jpg` in the app's selection pool; the original file has been removed.
+The random picture selection contains fifteen supplied PNGs: the original twelve added on 1 October 2026, plus the approved lecture, tennis, and gymnastics illustrations added on 2 October 2026.
 
 - `snapscape-beach.png`
 - `snapscape-bike.png`
@@ -12,14 +12,19 @@ Added to the random picture selection on 1 October 2026. These twelve supplied P
 - `snapscape-diner.png`
 - `snapscape-fishing.png`
 - `snapscape-football.png`
+- `snapscape-gymnastics.png`
 - `snapscape-interstate-95.png`
 - `snapscape-kajak.png`
+- `snapscape-lecture.png`
 - `snapscape-mall.png`
 - `snapscape-miami.png`
 - `snapscape-oranges.png`
 - `snapscape-st-augustine.png`
+- `snapscape-tennis.png`
 
 Each image is 1448 × 1086 pixels (4:3), without an alpha channel. The app loads only the selected full-size picture and uses the existing local resize/compression flow, preserving the complete image and its proportions. The supplied PNG files are unchanged.
+
+The three additions were generated with the built-in image-generation tool using the mascot and existing puzzle illustrations as references. The approved gymnastics revision has human participants in the background; the approved lecture revision seats Gator facing the lecturer. Tennis uses the approved first version. The playable files are byte-for-byte copies of those approved previews. Sunshine Explorer now requires all fifteen distinct pictures, with its existing 100 Snap Points reward.
 
 The random button previews bookstore, beach, oranges, Miami, and kayak using 144 × 108 JPEG delivery copies in `assets/thumbnails/`, resized with macOS `sips` at JPEG quality 78. The five files total 62,405 bytes. CSS crops their display into small decorative cards; the source pictures and playable puzzles retain the complete images.
 
