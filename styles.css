@@ -1387,6 +1387,9 @@ main:has(#game:not([hidden])) {
 .icon-delete {
   --toolbar-icon: url("./assets/delete_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg");
 }
+.icon-close {
+  --toolbar-icon: url("./assets/close_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg");
+}
 .zoom-control {
   min-width: 0;
 }
@@ -2005,7 +2008,7 @@ dialog::backdrop {
   position: absolute;
   top: 10px;
   right: 12px;
-  font-size: 25px;
+  padding: 0;
 }
 .modal-content h2,
 #modal-content h2 {
@@ -2029,10 +2032,12 @@ dialog::backdrop {
   max-width: 100%;
   margin: 0;
 }
-.picture-guide-dialog {
+.picture-guide-dialog,
+.new-puzzle-dialog {
   text-align: center;
 }
-.picture-guide-mascot {
+.picture-guide-mascot,
+.new-puzzle-mascot {
   display: block;
   width: 160px;
   height: 160px;
@@ -2457,6 +2462,7 @@ dialog:has(.win) {
     place-items: center;
     width: 44px;
     height: 44px;
+    padding: 0;
     border: 0;
     border-radius: 50%;
     background: transparent;
@@ -2482,11 +2488,12 @@ dialog:has(.win) {
   .nav-toggle-icon::after {
     transform: translateY(8px);
   }
-  .nav-toggle[aria-expanded="true"] .nav-toggle-icon::before {
-    transform: translateY(4px) rotate(45deg);
+  .nav-toggle .icon-close,
+  .nav-toggle[aria-expanded="true"] .nav-toggle-icon {
+    display: none;
   }
-  .nav-toggle[aria-expanded="true"] .nav-toggle-icon::after {
-    transform: translateY(4px) rotate(-45deg);
+  .nav-toggle[aria-expanded="true"] .icon-close {
+    display: block;
   }
   .main-navigation {
     display: none;

@@ -22,7 +22,7 @@ import {
   ACHIEVEMENTS,
   SAMPLE_SNAPSCAPES,
   validateData,
-} from "./engine.js?v=20261002-10";
+} from "./engine.js?v=20261002-18";
 const $ = (s) => document.querySelector(s),
   KEY = "snapscape.v1";
 const PUZZLE_TITLES = [
@@ -276,14 +276,17 @@ function renderPhotoPreview(photo) {
     viewHeight = height + pieceSize * 0.64,
     preview = $("#preview-image");
   // Reuse a square bottom-left corner from the game's puzzle-piece geometry.
-  const corner = piecePath({ difficulty: "breezy", ratio: 4 / 3, seed: 0 }, 8);
+  const level = difficulty("breezy"),
+    cornerGame = { difficulty: level.id, ratio: level.cols / level.rows, seed: 0 },
+    corner = piecePath(cornerGame, level.cols * (level.rows - 1)),
+    cornerWidth = geometry(cornerGame).cw;
   // Center the photo itself; the loose piece overflows to the left without shifting it.
   preview.setAttribute("viewBox", `0 ${-pieceSize * 0.04} ${width} ${viewHeight}`);
   $("#photo-preview").style.setProperty("--preview-width", `${280 * width / viewHeight}px`);
   // Both parts reference the same image, keeping the cutout and loose piece aligned.
   preview.innerHTML = `<defs>
     <image id="preview-photo-source" href="${safe(photo.image)}" width="${width}" height="${height}"/>
-    <path id="preview-corner" d="${corner}" transform="translate(0 ${height - pieceSize}) scale(${pieceSize / 225})"/>
+    <path id="preview-corner" d="${corner}" transform="translate(0 ${height - pieceSize}) scale(${pieceSize / cornerWidth})"/>
     <mask id="preview-photo-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="${height}" style="mask-type: luminance">
       <rect width="${width}" height="${height}" fill="white"/>
       <use href="#preview-corner" fill="black"/>
@@ -424,7 +427,16 @@ function confirmNew() {
   if (!selectedPhoto || photoLoading) return;
   if (data.active) {
     modal(
-      '<p class="eyebrow">A FRESH TABLE</p><h2>Start a new puzzle?</h2><p>This will replace your unfinished puzzle. Your Trophy Swamp and points will stay safe.</p><div class="dialog-actions"><button id="confirm-new" class="button primary">Start a new puzzle</button><button id="keep-old" class="button secondary">Keep my saved puzzle</button></div>',
+      `<div class="new-puzzle-dialog">
+        <img class="new-puzzle-mascot" src="./assets/gator-peek.png" alt="" width="160" height="160" aria-hidden="true">
+        <h2 id="new-puzzle-title">Start a new puzzle?</h2>
+        <p>This will replace your unfinished puzzle.</p>
+        <div class="dialog-actions">
+          <button id="confirm-new" class="button primary" type="button">Start a new puzzle</button>
+          <button id="keep-old" class="button secondary" type="button">Keep my saved puzzle</button>
+        </div>
+      </div>`,
+      "new-puzzle-title",
     );
     $("#confirm-new").onclick = () => {
       closeModal();
@@ -1466,7 +1478,7 @@ $("#achievement-content").addEventListener("keydown", (event) => {
 $("#help-button").addEventListener("click", () => {
   if (game) pause();
   modal(
-    '<p class="eyebrow">MAKE YOURSELF AT HOME</p><h2>A few friendly pointers.</h2><ol class="help-list"><li>Choose a photo and a difficulty. Your photo keeps its original shape. Use the pencil beside the suggested name in step 3 to make it yours, or change it later beside the title during play.</li><li>Drag pieces from the tray onto the table. You can also tap a piece, then tap a spot on the table.</li><li>Matching neighbors snap into groups you can move together. Pieces lock when they reach their home in the frame, facing upright.</li><li>Turn on Give it a twist before starting for randomly rotated pieces and double puzzle points. Select a piece, then use Rotate left or Rotate right above the selected piece to turn it 90°. You can also press R to turn right or Shift+R to turn left. Connected groups rotate together. Twist doubles base points, the rounded time bonus, and Picture guide costs; achievement rewards stay the same.</li><li>Picture guide previews the photo until you move a piece. Each use costs 10% of the difficulty’s base points, rounded to the nearest whole point: 1, 3, 6, or 14 Snap Points. The first use asks you to confirm; after 10 uses, the puzzle earns no points, including any time bonus. Edge pieces filters the border pieces for free. Zoom offers 50%, 75%, Fit, 125%, 150%, and 200%. Fit shows the whole picture. Pan table lets you swipe around a zoomed table; turn it off to move pieces.</li><li>For keyboard play, select a piece with Enter, use arrow keys on the table, and press Enter to place. Escape puts the selection down.</li><li>The clock counts active play only. Pause anytime; hiding this tab pauses automatically.</li></ol><p>Each puzzle starts with base points and a time bonus of up to 50%, rounded to the nearest whole point. The bonus gradually reaches zero at 4, 10, 20, or 40 minutes, depending on difficulty. All Snap Points are whole numbers. Picture guide deductions cannot reduce this puzzle’s reward below zero; previously earned points stay yours.</p><p>Each Chomp Club achievement adds a one-time reward of 5–200 Snap Points, shown on its card. Already earned achievements count, too. Achievement rewards count toward point milestones and remain available even when a puzzle earns no points. Your total includes puzzle and achievement rewards.</p><p><strong>Your puzzle saves automatically in this browser</strong> after every move and regularly while you play. You can close the tab and return later. Select the snapscape logo to return to photo setup, or visit the Trophy Swamp and Chomp Club. Select <strong>Continue puzzle</strong> to pick up where you left off.</p><p>Use <strong>Options → Back up memories</strong> to keep a copy or move to another device.</p><p><strong>Choosing a photo:</strong> JPG, PNG, or WebP, up to 20 MB. HEIC/HEIF photos work only if your browser can open them; otherwise use a JPG copy.</p>',
+    '<p class="eyebrow">MAKE YOURSELF AT HOME</p><h2>A few friendly pointers.</h2><ol class="help-list"><li>Choose a photo and a difficulty. Your photo keeps its original shape. Use the pencil beside the suggested name in step 3 to make it yours, or change it later beside the title during play.</li><li>Drag pieces from the tray onto the table. You can also tap a piece, then tap a spot on the table.</li><li>Matching neighbors snap into groups you can move together. Pieces lock when they reach their home in the frame, facing upright.</li><li>Turn on Give it a twist before starting for randomly rotated pieces and double puzzle points. Select a piece, then use Rotate left or Rotate right above the selected piece to turn it 90°. You can also press R to turn right or Shift+R to turn left. Connected groups rotate together. Twist doubles base points, the rounded time bonus, and Picture guide costs; achievement rewards stay the same.</li><li>Picture guide previews the photo until you move a piece. Each use costs 10% of the difficulty’s base points, rounded to the nearest whole point: 1, 3, 6, or 14 Snap Points. The first use asks you to confirm; after 10 uses, the puzzle earns no points, including any time bonus. Edge pieces filters the border pieces for free. Zoom offers 50%, 75%, Fit, 125%, 150%, and 200%. Fit shows the whole picture. Pan table lets you swipe around a zoomed table; turn it off to move pieces.</li><li>For keyboard play, select a piece with Enter, use arrow keys on the table, and press Enter to place. Escape puts the selection down.</li><li>The clock counts active play only. Pause anytime; hiding this tab pauses automatically.</li></ol><p>Each puzzle starts with base points and a time bonus of up to 50%, rounded to the nearest whole point. The bonus gradually reaches zero by 8, 20, 40, or 80 minutes, depending on difficulty. All Snap Points are whole numbers. Picture guide deductions cannot reduce this puzzle’s reward below zero; previously earned points stay yours.</p><p>Each Chomp Club achievement adds a one-time reward of 5–200 Snap Points, shown on its card. Already earned achievements count, too. Achievement rewards count toward point milestones and remain available even when a puzzle earns no points. Your total includes puzzle and achievement rewards.</p><p><strong>Your puzzle saves automatically in this browser</strong> after every move and regularly while you play. You can close the tab and return later. Select the snapscape logo to return to photo setup, or visit the Trophy Swamp and Chomp Club. Select <strong>Continue puzzle</strong> to pick up where you left off.</p><p>Use <strong>Options → Back up memories</strong> to keep a copy or move to another device.</p><p><strong>Choosing a photo:</strong> JPG, PNG, or WebP, up to 20 MB. HEIC/HEIF photos work only if your browser can open them; otherwise use a JPG copy.</p>',
   );
 });
 const optionsToggle = $("#options-toggle"),

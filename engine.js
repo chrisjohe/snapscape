@@ -1,14 +1,14 @@
 export const DIFFICULTIES = [
-  { id: "breezy", name: "Breezy", cols: 4, rows: 3, points: 10, target: 120 },
-  { id: "snappy", name: "Snappy", cols: 6, rows: 4, points: 25, target: 300 },
-  { id: "bold", name: "Bold", cols: 8, rows: 6, points: 60, target: 600 },
+  { id: "breezy", name: "Breezy", cols: 6, rows: 4, points: 10, target: 240 },
+  { id: "snappy", name: "Snappy", cols: 8, rows: 6, points: 25, target: 600 },
+  { id: "bold", name: "Bold", cols: 12, rows: 8, points: 60, target: 1200 },
   {
     id: "legend",
     name: "Legend",
-    cols: 12,
-    rows: 8,
+    cols: 16,
+    rows: 12,
     points: 140,
-    target: 1200,
+    target: 2400,
   },
 ];
 export const difficulty = (id) => DIFFICULTIES.find((d) => d.id === id);
@@ -323,7 +323,7 @@ export const ACHIEVEMENTS = [
     icon: "bolt",
     description: "Finish a puzzle within its pace target.",
     test: (r) => r.some((x) => x.seconds <= difficulty(x.difficulty).target),
-    progress: () => "Targets: 2, 5, 10, or 20 minutes.",
+    progress: () => "Targets: 4, 10, 20, or 40 minutes.",
   },
   {
     id: "scholar",
@@ -387,7 +387,7 @@ export const ACHIEVEMENTS = [
     points: 50,
     name: "Swamp Legend",
     icon: "crown",
-    description: "Bring all 96 pieces home on Legend.",
+    description: "Bring all 192 pieces home on Legend.",
     test: (r) => r.some((x) => x.difficulty === "legend"),
     progress: () => "Your biggest challenge awaits.",
   },
@@ -490,9 +490,13 @@ export function validateData(value) {
   if (new Set(records.map((r) => r.id)).size !== records.length)
     throw new Error("This backup contains duplicate puzzle records.");
   let active = null;
-  if (value.active) {
+  const savedLevel = difficulty(value.active?.difficulty);
+  // A different part count cannot resume on the current grid; keep the trophies.
+  const gridChanged = savedLevel && Array.isArray(value.active.pieces) &&
+    value.active.pieces.length !== savedLevel.cols * savedLevel.rows;
+  if (value.active && !gridChanged) {
     const a = value.active,
-      d = difficulty(a.difficulty),
+      d = savedLevel,
       guideUses = a.guideUses === undefined ? 0 : a.guideUses;
     if (
       !d ||

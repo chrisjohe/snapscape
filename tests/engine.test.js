@@ -158,6 +158,23 @@ test("bonuses decline in whole points, stop at zero, and never reduce base point
     assert.equal(score(d.id, 1000000).total, d.points);
   }
 });
+test("larger puzzles retain a time bonus at the extended pace targets and unlock Quick on the Chomp inclusively", () => {
+  const quick = ACHIEVEMENTS.find((a) => a.id === "quick");
+  for (const [id, paceMinutes, bonusEndMinutes, bonusAtTarget] of [
+    ["breezy", 4, 8, 3],
+    ["snappy", 10, 20, 6],
+    ["bold", 20, 40, 15],
+    ["legend", 40, 80, 35],
+  ]) {
+    const seconds = paceMinutes * 60;
+    assert.equal(quick.test([{ difficulty: id, seconds: seconds - 1 }]), true, id);
+    assert.equal(quick.test([{ difficulty: id, seconds }]), true, id);
+    assert.equal(quick.test([{ difficulty: id, seconds: seconds + 1 }]), false, id);
+    assert.equal(score(id, seconds).bonus, bonusAtTarget, id);
+    assert.equal(score(id, bonusEndMinutes * 60).bonus, 0, id);
+    assert.equal(score(id, bonusEndMinutes * 60 + 1).bonus, 0, id);
+  }
+});
 test("Picture guide charges whole points, caps deductions, and forfeits the reward from ten uses", () => {
   assert.deepEqual(DIFFICULTIES.map((d) => pictureGuideCost(d.id)), [1, 3, 6, 14]);
   for (const d of DIFFICULTIES) {
@@ -191,11 +208,12 @@ test("scores remain whole and nonnegative across times, difficulties, and guide 
       }
     }
   }
-  assert.deepEqual(score("snappy", 60, 1), { base: 25, bonus: 11, guidePenalty: 3, total: 33 });
-  assert.deepEqual(score("snappy", 600, 9), { base: 25, bonus: 0, guidePenalty: 25, total: 0 });
-  assert.equal(score("breezy", 23.99).bonus, 5);
-  assert.equal(score("breezy", 24).bonus, 5);
-  assert.equal(score("breezy", 24.01).bonus, 4);
+  assert.deepEqual(score("snappy", 60, 1), { base: 25, bonus: 12, guidePenalty: 3, total: 34 });
+  assert.deepEqual(score("snappy", 600, 9), { base: 25, bonus: 6, guidePenalty: 27, total: 4 });
+  assert.deepEqual(score("snappy", 1200, 9), { base: 25, bonus: 0, guidePenalty: 25, total: 0 });
+  assert.equal(score("breezy", 47.99).bonus, 5);
+  assert.equal(score("breezy", 48).bonus, 5);
+  assert.equal(score("breezy", 48.01).bonus, 4);
 });
 test("point milestones include whole achievement rewards and cannot fund their own unlock", () => {
   assert.equal(collectedPoints([{ points: 363 }, { points: 13.8 }, { points: 12.8 }]), 390);
@@ -250,7 +268,7 @@ test("backup validation roundtrips state and rejects malformed records and dupli
     ownPhoto: true,
   };
   const valid = { version: 1, records: [record], active: g, revision: "rev" };
-  assert.equal(validateData(valid).active.pieces.length, 12);
+  assert.equal(validateData(valid).active.pieces.length, g.pieces.length);
   assert.throws(() => validateData({ ...valid, records: [record, record] }));
   assert.equal(
     validateData({ ...valid, records: [{ ...record, points: 9999 }] }).records[0].points,
@@ -261,9 +279,26 @@ test("backup validation roundtrips state and rejects malformed records and dupli
     validateData({ ...valid, active: { ...g, image: "javascript:alert(1)" } }),
   );
   assert.throws(() =>
-    validateData({ ...valid, active: { ...g, order: Array(12).fill(0) } }),
+    validateData({ ...valid, active: { ...g, order: Array(g.pieces.length).fill(0) } }),
   );
   assert.throws(() => validateData({ ...valid, active: { ...g, ratio: 0 } }));
+});
+test("an outdated active grid is discarded while completed records use only their difficulty", () => {
+  for (const { id } of DIFFICULTIES) {
+    const g = game(id), count = g.pieces.length / 2;
+    g.pieces = Array(count).fill(null);
+    g.order = Array.from({ length: count }, (_, i) => i);
+    const data = { version: 1, active: g, records: [{
+      id: "old-finished-puzzle", name: "Memory", difficulty: id,
+      seconds: 60, date: "2026-10-01T12:00:00Z", pieceCount: count,
+    }] };
+    const restored = validateData(data);
+    assert.equal(restored.active, null);
+    assert.equal(restored.records[0].difficulty, id);
+    assert.equal(Object.hasOwn(restored.records[0], "pieceCount"), false);
+    assert.equal(restored.records[0].points, score(id, 60).total);
+    assert.deepEqual(validateData(JSON.parse(JSON.stringify(restored))), restored);
+  }
 });
 test("achievements are derived from completed puzzles and include resumed and own photos", () => {
   assert.equal(ACHIEVEMENTS.length, 14);
@@ -300,7 +335,7 @@ test("Golden Gator counts earned points after guide deductions and unlocks at ex
   ];
   assert.equal(achievement.test(records), false);
   assert.equal(achievement.progress(records), `999 / ${(1000).toLocaleString()} points`);
-  records.push(record("breezy", 240, 9));
+  records.push(record("breezy", 480, 9));
   assert.equal(achievement.test(records), true);
   assert.equal(achievement.progress(records), `${(1000).toLocaleString()} / ${(1000).toLocaleString()} points`);
   records.at(-1).points--;
@@ -554,7 +589,7 @@ test("tray return, rotation, and placement retain angles and fit rectangular pie
 });
 
 test("Twist doubles whole puzzle rewards and guide costs, with zero after ten guides", () => {
-  for (const d of DIFFICULTIES) for (const seconds of [0, 24.01, 60, d.target, d.target * 2]) {
+  for (const d of DIFFICULTIES) for (const seconds of [0, 48.01, 60, d.target, d.target * 2]) {
     for (const guides of [0, 1, 2, 9, 10, 11]) {
       const normal = score(d.id, seconds, guides), twist = score(d.id, seconds, guides, true);
       for (const key of Object.keys(normal)) assert.equal(twist[key], normal[key] * 2);
@@ -570,15 +605,15 @@ test("legacy backups stay upright and malformed rotation or group state is rejec
   assert.equal(pieceRotation(legacy, 0), 0);
   const g = twistGame();
   for (const twist of ["true", 1, null]) assert.throws(() => restoreTwist({ ...g, twist }));
-  for (const rotations of [undefined, null, [], Array(12).fill(4), Array(12).fill(-1), Array(12).fill(0.5), Array(12).fill("0")]) {
+  for (const rotations of [undefined, null, [], ...[4, -1, 0.5, "0"].map((angle) => Array(g.pieces.length).fill(angle))]) {
     assert.throws(() => restoreTwist({ ...g, rotations }));
   }
-  assert.throws(() => restoreTwist({ ...g, twist: false, rotations: Array(12).fill(1) }));
+  assert.throws(() => restoreTwist({ ...g, twist: false, rotations: Array(g.pieces.length).fill(1) }));
   g.pieces[0] = { id: 0, x: 0, y: 0, group: 0, locked: true };
   g.rotations[0] = 1;
   assert.throws(() => restoreTwist(g));
   g.pieces[0] = { id: 0, x: 100, y: 150, group: 0, locked: false };
-  g.pieces[1] = { id: 1, x: 100, y: 375, group: 0, locked: false };
+  g.pieces[1] = { id: 1, x: 100, y: 150 + geometry(g).cw, group: 0, locked: false };
   assert.throws(() => restoreTwist(g));
   g.rotations[1] = 1;
   assert.doesNotThrow(() => restoreTwist(g));

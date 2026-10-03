@@ -15,7 +15,7 @@ function savedProgress() {
     active: {
       id: "active-puzzle", name: "Unfinished memory", difficulty: "breezy",
       ratio: 1.5, seconds: 30, seed: 123, image: "data:image/jpeg;base64,AAAA",
-      order: Array.from({ length: 12 }, (_, i) => i), pieces: Array(12).fill(null),
+      order: Array.from({ length: 24 }, (_, i) => i), pieces: Array(24).fill(null),
     },
     records: [{
       id: "finished-puzzle", name: "Finished memory", difficulty: "breezy",
@@ -183,6 +183,29 @@ test("the setup title can be edited without changing a saved game, then starts a
   const restored = app(a.storage);
   restored.run("resumeSavedGame();");
   assert.equal(restored.node("#game-name").textContent, "Our spring escape");
+});
+
+test("new difficulty counts survive start, resume, completion, and trophy reload", async () => {
+  for (const [id, count] of [["breezy", 24], ["snappy", 48], ["bold", 96], ["legend", 192]]) {
+    const a = app();
+    assert.match(a.node("#gallery-content").innerHTML, /24 pieces/);
+    assert.doesNotMatch(a.node("#difficulty-options").innerHTML, /<b>12<\/b>/);
+    a.node('[name=difficulty]:checked').value = id;
+    a.run('selectedPhoto = { image: "data:image/jpeg;base64,AAAA", ratio: 1.5 }; startGame();');
+    assert.equal(a.run("game.pieces.length"), count);
+    assert.equal(a.node("#piece-progress").getAttribute("aria-valuemax"), String(count));
+    const resumed = app(a.storage);
+    resumed.run("resumeSavedGame();");
+    assert.equal(resumed.run("game.pieces.length"), count);
+    resumed.run(`game.pieces = game.pieces.map((_, id) => ({ id, group: id, ...target(game, id), locked: true }));
+      prepareImage = async () => ({ image: "data:image/jpeg;base64,AAAA" });`);
+    await resumed.run("completeGame();");
+    assert.equal(Object.hasOwn(JSON.parse(a.storage.get(KEY)).records.at(-1), "pieceCount"), false);
+    const reloaded = app(a.storage);
+    assert.equal(reloaded.run("data.records.at(-1).difficulty"), id);
+    assert.ok(reloaded.node("#gallery-content").innerHTML.includes(`${count} pieces`));
+    assert.match(reloaded.node("#gallery-content").innerHTML, /24 pieces/);
+  }
 });
 
 test("blank names and dismissed setup edits keep the suggested title", async () => {
@@ -384,29 +407,29 @@ test("progress ring counts only locked pieces, restores progress, and resets for
   const a = app();
   a.run("game = data.active; updateGameProgress();");
   const progress = a.node("#piece-progress"), fill = a.node("#piece-progress-fill");
-  assert.equal(progress.getAttribute("aria-valuemax"), "12");
+  assert.equal(progress.getAttribute("aria-valuemax"), "24");
   assert.equal(progress.getAttribute("aria-valuenow"), "0");
   assert.equal(fill.getAttribute("stroke-dashoffset"), "100");
-  // Half locked, one loose piece on the table, and five still in the tray.
-  a.run(`game.pieces = Array.from({ length: 12 }, (_, i) =>
-    i < 6 ? { id: i, group: i, ...target(game, i), locked: true }
-      : i === 6 ? { id: i, group: i, x: 50, y: 50, locked: false } : null);
+  // Half locked, one loose piece on the table, and eleven still in the tray.
+  a.run(`game.pieces = Array.from({ length: 24 }, (_, i) =>
+    i < 12 ? { id: i, group: i, ...target(game, i), locked: true }
+      : i === 12 ? { id: i, group: i, x: 50, y: 50, locked: false } : null);
     updateGameProgress();`);
-  assert.equal(a.node("#placed-count").textContent, "6 / 12");
-  assert.equal(progress.getAttribute("aria-valuetext"), "6 of 12 pieces placed");
+  assert.equal(a.node("#placed-count").textContent, "12 / 24");
+  assert.equal(progress.getAttribute("aria-valuetext"), "12 of 24 pieces placed");
   assert.equal(fill.getAttribute("stroke-dashoffset"), "50");
   // A fresh app reads the stored state and computes the same progress on resume.
   a.run("save();");
   const resumed = app(a.storage);
   resumed.run("game = data.active; updateGameProgress();");
-  assert.equal(resumed.node("#piece-progress").getAttribute("aria-valuenow"), "6");
+  assert.equal(resumed.node("#piece-progress").getAttribute("aria-valuenow"), "12");
   assert.equal(resumed.node("#piece-progress-fill").getAttribute("stroke-dashoffset"), "50");
   a.run("game.pieces.fill({ locked: true }); updateGameProgress();");
-  assert.equal(progress.getAttribute("aria-valuenow"), "12");
+  assert.equal(progress.getAttribute("aria-valuenow"), "24");
   assert.equal(fill.getAttribute("stroke-dashoffset"), "0");
-  a.run('game = { difficulty: "legend", pieces: Array(96).fill(null) }; updateGameProgress();');
-  assert.equal(a.node("#placed-count").textContent, "0 / 96");
-  assert.equal(progress.getAttribute("aria-valuemax"), "96");
+  a.run('game = { difficulty: "legend", pieces: Array(192).fill(null) }; updateGameProgress();');
+  assert.equal(a.node("#placed-count").textContent, "0 / 192");
+  assert.equal(progress.getAttribute("aria-valuemax"), "192");
   assert.equal(progress.getAttribute("aria-valuenow"), "0");
   assert.equal(fill.getAttribute("stroke-dashoffset"), "100");
 });
@@ -725,22 +748,22 @@ test("Snappy guide copy and completion report whole deductions and rewards consi
     prepareImage = async () => ({ image: "data:image/jpeg;base64,AAAA" });`);
   await a.run("completeGame();");
   const record = engine.validateData(JSON.parse(a.storage.get(KEY))).records[0];
-  assert.equal(record.points, 33);
+  assert.equal(record.points, 34);
   assert.equal(record.guideUses, 1);
-  assert.ok(a.node("#modal-content").innerHTML.includes(`<span class="sr-only">+${(78).toLocaleString()}</span>`));
+  assert.ok(a.node("#modal-content").innerHTML.includes(`<span class="sr-only">+${(79).toLocaleString()}</span>`));
   await a.node("#win-stats-button").click();
   const content = a.node("#modal-content").innerHTML;
   assert.ok(content.includes(`Picture guide (1 use)</dt><dd>−${(3).toLocaleString()}</dd>`));
-  assert.ok(content.includes(`Time bonus</dt><dd>+${(11).toLocaleString()}</dd>`));
+  assert.ok(content.includes(`Time bonus</dt><dd>+${(12).toLocaleString()}</dd>`));
   assert.ok(content.includes("Achievement bonus</dt><dd>+45</dd>"));
-  assert.equal(a.node("#total-points").textContent, (83).toLocaleString());
+  assert.equal(a.node("#total-points").textContent, (84).toLocaleString());
 });
 
 test("Snappy guide announces a zero reward once rounded deductions exhaust it", async () => {
   const a = app(new Map());
   a.node('[name=difficulty]:checked').value = "snappy";
   a.run(`showPhoto({ image: "data:image/jpeg;base64,AAAA", ratio: 1.5 }); startGame();
-    elapsed = 600; game.guideUses = 8;`);
+    elapsed = 1200; game.guideUses = 8;`);
   await a.node("#reference-button").click();
   assert.equal(a.run("game.guideUses"), 9);
   assert.match(a.node("#announcement").textContent, /This puzzle will earn no points/);
@@ -763,15 +786,15 @@ test("legacy fractional rewards become whole in loaded totals, galleries, export
   });
   await restored.node("#confirm-import").click();
   for (const a of [loaded, restored, app(restored.storage)]) {
-    assert.equal(a.node("#total-points").textContent, "82");
+    assert.equal(a.node("#total-points").textContent, "87");
     a.run('switchView("gallery");');
-    for (const points of [14, 33, 0]) {
+    for (const points of [14, 34, 4]) {
       assert.ok(a.node("#gallery-content").innerHTML.includes(`<span>+${points}</span>`));
     }
     await a.node("#export-button").click();
     const exported = JSON.parse(await a.blobs.at(-1).text());
-    assert.deepEqual(exported.records.map((r) => r.points), [14, 33, 0]);
-    assert.equal(engine.achievementProgress(exported.records, exported).totalPoints, 82);
+    assert.deepEqual(exported.records.map((r) => r.points), [14, 34, 4]);
+    assert.equal(engine.achievementProgress(exported.records, exported).totalPoints, 87);
   }
 });
 
@@ -1102,8 +1125,9 @@ test("existing completed history unlocks all five added achievements on load", (
   for (const name of ["A Little Guidance", "Swamp Regular", "Chomp Champion", "Golden Gator", "Every Kind of Chomp"]) {
     assert.ok(unlocked.includes(name), name);
   }
-  assert.equal(a.node("#achievement-count").textContent, "10");
-  assert.match(a.node("#achievement-progress").innerHTML, /<strong>10<\/strong> of 14/);
+  assert.ok(unlocked.includes("Quick on the Chomp"));
+  assert.equal(a.node("#achievement-count").textContent, "11");
+  assert.match(a.node("#achievement-progress").innerHTML, /<strong>11<\/strong> of 14/);
 });
 
 test("new completion milestones are announced on crossing their thresholds and only once", async () => {
@@ -1117,7 +1141,7 @@ test("new completion milestones are announced on crossing their thresholds and o
     ["fifty", Array.from({ length: 49 }, (_, i) => record("breezy", i))],
     ["points-5000", [
       ...Array.from({ length: 3 }, (_, i) => record("legend", i, 0)),
-      record("legend", 3, 1440), record("bold", 4),
+      record("legend", 3, 2880), record("bold", 4),
     ]],
     ["all-difficulties", [record("snappy", 0), record("bold", 1), record("legend", 2)]],
   ];
@@ -1157,7 +1181,7 @@ test("Twist toggle starts random orientations, resumes them, and allows a normal
   startTwist(a);
   const saved = JSON.parse(a.storage.get(KEY)).active;
   assert.equal(saved.twist, true);
-  assert.equal(saved.rotations.length, 12);
+  assert.equal(saved.rotations.length, 24);
   assert.ok(saved.rotations.some((angle) => angle !== 0));
   assert.ok(saved.rotations.every((angle) => Number.isInteger(angle) && angle >= 0 && angle <= 3));
   assert.equal(a.node("#rotation-controls").hidden, true);

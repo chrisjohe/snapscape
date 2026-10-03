@@ -16,8 +16,8 @@
     <link rel="icon" href="./assets/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./assets/favicon-16.png" type="image/png" sizes="16x16" />
     <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png" sizes="180x180" />
-    <link rel="stylesheet" href="./styles.css?v=20261002-13" />
-    <script type="module" src="./app.js?v=20261002-13"></script>
+    <link rel="stylesheet" href="./styles.css?v=20261002-17" />
+    <script type="module" src="./app.js?v=20261002-18"></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to Puzzle Table</a>
@@ -41,6 +41,7 @@
         aria-controls="main-navigation"
       >
         <span class="nav-toggle-icon" aria-hidden="true"></span>
+        <span class="toolbar-icon icon-close" aria-hidden="true"></span>
       </button>
       <nav
         id="main-navigation"
@@ -336,11 +337,11 @@
                     role="progressbar"
                     aria-label="Pieces home"
                     aria-valuemin="0"
-                    aria-valuemax="24"
+                    aria-valuemax="48"
                     aria-valuenow="0"
-                    aria-valuetext="0 of 24 pieces placed"
+                    aria-valuetext="0 of 48 pieces placed"
                   >
-                    <strong id="placed-count" class="stat-value">0 / 24</strong>
+                    <strong id="placed-count" class="stat-value">0 / 48</strong>
                     <svg class="progress-ring" viewBox="0 0 32 32" aria-hidden="true">
                       <circle class="progress-track" cx="16" cy="16" r="12" />
                       <circle
@@ -476,13 +477,15 @@
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     <div id="announcement" class="sr-only" aria-live="polite"></div>
     <dialog id="modal" aria-label="Snapscape message">
-      <button class="icon-button modal-close" id="modal-close" aria-label="Close dialog">
-        ×
+      <button class="icon-button modal-close" id="modal-close" type="button" aria-label="Close dialog">
+        <span class="toolbar-icon icon-close" aria-hidden="true"></span>
       </button>
       <div id="modal-content"></div>
     </dialog>
     <dialog id="about-dialog" class="about-dialog" aria-labelledby="about-title">
-      <button class="icon-button modal-close" id="about-close" type="button" aria-label="Close Privacy and About">×</button>
+      <button class="icon-button modal-close" id="about-close" type="button" aria-label="Close Privacy and About">
+        <span class="toolbar-icon icon-close" aria-hidden="true"></span>
+      </button>
       <h2 id="about-title" tabindex="-1" autofocus>Privacy &amp; About</h2>
       <p>A personal puzzle project by Christian J. Heinze ©.</p>
       <p>This is a free, non-commercial hobby project, created for fun and personal learning.</p>
@@ -525,7 +528,9 @@
         <p>For source code, bug reports, and support, visit <a href="https://github.com/chrisjohe/snapscape" target="_blank" rel="noopener noreferrer">Support on GitHub</a>.</p>
       </section>
       <div class="dialog-actions">
-        <button class="button secondary" id="about-done" type="button">Close</button>
+        <button class="button secondary" id="about-done" type="button">
+          <span class="toolbar-icon icon-close" aria-hidden="true"></span>Close
+        </button>
       </div>
     </dialog>
     <noscript
