@@ -47,17 +47,19 @@ export function boardViewport({
     scale: Number.isFinite(zoom) && zoom >= 0.5 && zoom <= 2 ? zoom : 1,
   };
 }
-export const pictureGuideCost = (id) => Math.round(difficulty(id).points / 10);
-export function score(id, seconds, guideUses = 0) {
+export const pictureGuideCost = (id, twist = false) =>
+  Math.round(difficulty(id).points / 10) * (twist ? 2 : 1);
+export function score(id, seconds, guideUses = 0, twist = false) {
   const d = difficulty(id);
-  const base = d.points;
+  const multiplier = twist ? 2 : 1;
+  const base = d.points * multiplier;
   const bonus = Math.round(
-    base * 0.5 * Math.max(0, 1 - seconds / (d.target * 2)),
-  );
+    d.points * 0.5 * Math.max(0, 1 - seconds / (d.target * 2)),
+  ) * multiplier;
   const gross = base + bonus;
   const guidePenalty = guideUses >= 10
     ? gross
-    : Math.min(gross, pictureGuideCost(id) * guideUses);
+    : Math.min(gross, pictureGuideCost(id, twist) * guideUses);
   return {
     base,
     bonus,
@@ -101,6 +103,65 @@ export function geometry(game) {
 export function target(game, id) {
   const { cols, cw, ch } = geometry(game);
   return { x: (id % cols) * cw, y: Math.floor(id / cols) * ch };
+}
+// Rotations are quarter turns, kept separately so tray pieces keep their angle.
+export const pieceRotation = (game, id) => game.twist ? game.rotations[id] : 0;
+export function rotateVector(x, y, turns) {
+  switch ((turns % 4 + 4) % 4) {
+    case 1: return { x: -y, y: x };
+    case 2: return { x: -x, y: -y };
+    case 3: return { x: y, y: -x };
+    default: return { x, y };
+  }
+}
+export function pieceBounds(game, id) {
+  const { cw, ch } = geometry(game),
+    sideways = pieceRotation(game, id) % 2,
+    width = sideways ? ch : cw,
+    height = sideways ? cw : ch;
+  return { x: (cw - width) / 2, y: (ch - height) / 2, width, height };
+}
+// An oversized rotated group remains centered and reachable; it can be turned
+// upright again. This matters for very wide or tall photos.
+export function constrainGroup(game, id) {
+  const piece = game.pieces[id];
+  if (!piece || piece.locked) return;
+  const members = game.pieces.filter((p) => p && p.group === piece.group),
+    { w, h } = geometry(game),
+    boxes = members.map((p) => {
+      const box = pieceBounds(game, p.id);
+      return { x: p.x + box.x, y: p.y + box.y, width: box.width, height: box.height };
+    }),
+    left = Math.min(...boxes.map((b) => b.x)),
+    right = Math.max(...boxes.map((b) => b.x + b.width)),
+    top = Math.min(...boxes.map((b) => b.y)),
+    bottom = Math.max(...boxes.map((b) => b.y + b.height));
+  const shift = (min, max, size) => max - min > size + 2 * BOARD_MARGIN
+    ? (size - min - max) / 2
+    : Math.max(-BOARD_MARGIN - min, Math.min(size + BOARD_MARGIN - max, 0));
+  const dx = shift(left, right, w), dy = shift(top, bottom, h);
+  members.forEach((p) => { p.x += dx; p.y += dy; });
+}
+export function rotateGroup(game, id, turns = 1) {
+  if (!game.twist || game.pieces[id]?.locked) return 0;
+  const quarterTurns = (turns % 4 + 4) % 4;
+  const piece = game.pieces[id],
+    members = piece
+      ? game.pieces.filter((p) => p && p.group === piece.group)
+      : [];
+  if (!piece) {
+    game.rotations[id] = (game.rotations[id] + quarterTurns) % 4;
+    return 1;
+  }
+  const pivot = { x: piece.x, y: piece.y };
+  for (const p of members) {
+    const offset = rotateVector(p.x - pivot.x, p.y - pivot.y, quarterTurns);
+    p.x = pivot.x + offset.x;
+    p.y = pivot.y + offset.y;
+    game.rotations[p.id] = (game.rotations[p.id] + quarterTurns) % 4;
+  }
+  constrainGroup(game, id);
+  return members.length;
 }
 export function edges(game, id) {
   const { cols, rows } = geometry(game),
@@ -151,7 +212,7 @@ export function placeGroup(game, id) {
     });
   const anchor = members.find((p) => {
     const t = target(game, p.id);
-    return Math.hypot(p.x - t.x, p.y - t.y) < tolerance;
+    return pieceRotation(game, p.id) === 0 && Math.hypot(p.x - t.x, p.y - t.y) < tolerance;
   });
   if (anchor) {
     const t = target(game, anchor.id);
@@ -163,7 +224,7 @@ export function placeGroup(game, id) {
       joined = false;
       outer: for (const a of members) {
         for (const b of game.pieces) {
-          if (!b || b.group === a.group) continue;
+          if (!b || b.group === a.group || pieceRotation(game, a.id) !== pieceRotation(game, b.id)) continue;
           const ac = a.id % cols,
             bc = b.id % cols,
             ar = Math.floor(a.id / cols),
@@ -171,8 +232,9 @@ export function placeGroup(game, id) {
           if (Math.abs(ac - bc) + Math.abs(ar - br) !== 1) continue;
           const ta = target(game, a.id),
             tb = target(game, b.id),
-            dx = b.x + ta.x - tb.x - a.x,
-            dy = b.y + ta.y - tb.y - a.y;
+            offset = rotateVector(ta.x - tb.x, ta.y - tb.y, pieceRotation(game, a.id)),
+            dx = b.x + offset.x - a.x,
+            dy = b.y + offset.y - a.y;
           if (Math.hypot(dx, dy) >= tolerance) continue;
           move(dx, dy);
           const oldGroup = piece.group,
@@ -194,6 +256,7 @@ export function placeGroup(game, id) {
       }
     }
   }
+  if (game.twist) constrainGroup(game, id);
   return members.filter((p) => p.locked).length;
 }
 export function returnGroupToTray(game, id) {
@@ -400,6 +463,7 @@ export function validateData(value) {
       typeof r.name !== "string" ||
       r.name.length > 60 ||
       !difficulty(r.difficulty) ||
+      (r.twist !== undefined && typeof r.twist !== "boolean") ||
       !finite(r.seconds, 0, 315360000) ||
       !Number.isSafeInteger(guideUses) ||
       guideUses < 0 ||
@@ -413,7 +477,8 @@ export function validateData(value) {
       name: r.name,
       difficulty: r.difficulty,
       seconds: r.seconds,
-      points: score(r.difficulty, r.seconds, guideUses).total,
+      points: score(r.difficulty, r.seconds, guideUses, r.twist).total,
+      twist: r.twist === true,
       guideUses,
       date: r.date,
       thumbnail: r.thumbnail || null,
@@ -439,6 +504,7 @@ export function validateData(value) {
       !Number.isSafeInteger(guideUses) ||
       guideUses < 0 ||
       !validSample(a) ||
+      (a.twist !== undefined && typeof a.twist !== "boolean") ||
       !Number.isInteger(a.seed) ||
       !image(a.image) ||
       !Array.isArray(a.pieces) ||
@@ -452,6 +518,13 @@ export function validateData(value) {
       records.some((r) => r.id === a.id)
     )
       throw new Error("The saved puzzle in this backup is damaged.");
+    const rotations = a.rotations === undefined
+      ? (a.twist ? null : Array(a.pieces.length).fill(0)) : a.rotations;
+    if (
+      !Array.isArray(rotations) || rotations.length !== a.pieces.length ||
+      rotations.some((turns) => !Number.isInteger(turns) || turns < 0 || turns > 3 || (!a.twist && turns !== 0))
+    )
+      throw new Error("The saved piece rotations in this backup are damaged.");
     active = {
       id: a.id,
       name: a.name,
@@ -459,6 +532,8 @@ export function validateData(value) {
       ratio: a.ratio,
       seconds: a.seconds,
       guideUses,
+      twist: a.twist === true,
+      rotations: [...rotations],
       seed: a.seed,
       image: a.image,
       order: a.order,
@@ -484,34 +559,55 @@ export function validateData(value) {
     const bounds = geometry(active);
     for (const p of active.pieces) {
       if (!p) continue;
-      const expected = target(active, p.id);
+      const home = target(active, p.id),
+        rotation = pieceRotation(active, p.id),
+        expected = rotateVector(home.x, home.y, rotation);
       const offset = {
         x: p.x - expected.x,
         y: p.y - expected.y,
         locked: p.locked,
+        rotation,
       };
       const group = groups.get(p.group);
       if (
         group &&
         (Math.abs(group.x - offset.x) > 0.01 ||
           Math.abs(group.y - offset.y) > 0.01 ||
-          group.locked !== p.locked)
+          group.locked !== p.locked || group.rotation !== rotation)
       )
         throw new Error(
           "A puzzle group in this backup has inconsistent positions.",
         );
-      groups.set(p.group, offset);
+      const box = pieceBounds(active, p.id);
+      groups.set(p.group, {
+        ...offset,
+        left: Math.min(group?.left ?? Infinity, p.x + box.x),
+        right: Math.max(group?.right ?? -Infinity, p.x + box.x + box.width),
+        top: Math.min(group?.top ?? Infinity, p.y + box.y),
+        bottom: Math.max(group?.bottom ?? -Infinity, p.y + box.y + box.height),
+      });
       if (
-        p.x < -85 ||
-        p.x > bounds.w - bounds.cw + 85 ||
-        p.y < -85 ||
-        p.y > bounds.h - bounds.ch + 85
+        !active.twist && (
+          p.x < -85 ||
+          p.x > bounds.w - bounds.cw + 85 ||
+          p.y < -85 ||
+          p.y > bounds.h - bounds.ch + 85
+        )
       )
         throw new Error("A puzzle piece is outside the table.");
       if (p?.locked) {
         const t = target(active, p.id);
-        if (Math.abs(p.x - t.x) > 0.01 || Math.abs(p.y - t.y) > 0.01)
+        if (rotation !== 0 || Math.abs(p.x - t.x) > 0.01 || Math.abs(p.y - t.y) > 0.01)
           throw new Error("A placed piece has an invalid position.");
+      }
+    }
+    if (active.twist) {
+      const withinTable = (min, max, size) => max - min > size + 2 * BOARD_MARGIN
+        ? Math.abs((min + max) / 2 - size / 2) <= 85
+        : min >= -85 && max <= size + 85;
+      for (const group of groups.values()) {
+        if (!withinTable(group.left, group.right, bounds.w) || !withinTable(group.top, group.bottom, bounds.h))
+          throw new Error("A puzzle group is outside the table.");
       }
     }
   }

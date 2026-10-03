@@ -13,12 +13,16 @@ import {
   target,
   edges,
   piecePath,
+  pieceRotation,
+  pieceBounds,
+  rotateGroup,
+  constrainGroup,
   placeGroup,
   returnGroupToTray,
   ACHIEVEMENTS,
   SAMPLE_SNAPSCAPES,
   validateData,
-} from "./engine.js?v=20261002-5";
+} from "./engine.js?v=20261002-10";
 const $ = (s) => document.querySelector(s),
   KEY = "snapscape.v1";
 const PUZZLE_TITLES = [
@@ -197,8 +201,16 @@ window.addEventListener("storage", (e) => {
 });
 $("#difficulty-options").innerHTML = DIFFICULTIES.map(
   (d) =>
-    `<label class="difficulty-option"><input type="radio" name="difficulty" value="${d.id}" ${d.id === "snappy" ? "checked" : ""}><img class="difficulty-gator" src="./assets/${d.id === "snappy" ? "mascot" : `gator-${d.id}`}.png" alt="" width="88" height="88" aria-hidden="true"><strong>${d.name}</strong><span><b>${d.cols * d.rows}</b> pieces</span><small class="difficulty-points">${d.points.toLocaleString()} <img class="difficulty-coin" src="./assets/snap-coin.png" alt="Snap Points" width="18" height="18"></small></label>`,
+    `<label class="difficulty-option"><input type="radio" name="difficulty" value="${d.id}" ${d.id === "snappy" ? "checked" : ""}><img class="difficulty-gator" src="./assets/${d.id === "snappy" ? "mascot" : `gator-${d.id}`}.png" alt="" width="64" height="64" aria-hidden="true"><span class="difficulty-copy"><strong>${d.name}</strong><span><b>${d.cols * d.rows}</b> pieces</span></span><small class="difficulty-points"><span data-base-points="${d.points}">${d.points.toLocaleString()}</span> <img class="difficulty-coin" src="./assets/snap-coin.png" alt="Snap Points" width="18" height="18"></small></label>`,
 ).join("");
+$("#random-rotation").addEventListener("click", () => {
+  const enabled = $("#random-rotation").getAttribute("aria-pressed") !== "true";
+  $("#random-rotation").setAttribute("aria-pressed", String(enabled));
+  document.querySelectorAll("[data-base-points]").forEach((label) => {
+    label.textContent = (Number(label.dataset.basePoints) * (enabled ? 2 : 1)).toLocaleString();
+  });
+  announce(enabled ? "Twist on. Rotate pieces to solve the puzzle and earn double puzzle points." : "Twist off. Pieces start upright.");
+});
 function puzzleName() {
   return selectedPhoto?.name || selectedPhoto?.suggestedName || "Your favorite memory";
 }
@@ -424,7 +436,10 @@ function confirmNew() {
 $("#start-button").addEventListener("click", confirmNew);
 function startGame() {
   const d = difficulty($("[name=difficulty]:checked").value),
-    count = d.cols * d.rows;
+    count = d.cols * d.rows,
+    twist = $("#random-rotation").getAttribute("aria-pressed") === "true",
+    rotations = Array.from({ length: count }, () => twist ? Math.floor(Math.random() * 4) : 0);
+  if (twist && rotations.every((turns) => turns === 0)) rotations[0] = 1;
   game = {
     id: randomId(),
     name: puzzleName(),
@@ -433,6 +448,8 @@ function startGame() {
     ownPhoto: selectedPhoto.ownPhoto,
     sampleId: selectedPhoto.sampleId ?? null,
     difficulty: d.id,
+    twist,
+    rotations,
     seed: Math.floor(Math.random() * 1000000),
     seconds: 0,
     guideUses: 0,
@@ -445,6 +462,7 @@ function startGame() {
   save();
 }
 function openGame() {
+  $("#rotate-piece").hidden = !game.twist;
   panMode = false;
   $("#pan-button").setAttribute("aria-pressed", "false");
   $("#puzzle-board").classList.remove("pan-mode");
@@ -547,6 +565,7 @@ function updatePauseButton() {
   button.setAttribute("aria-label", label);
   button.title = label;
   $("#reference-button").disabled = paused;
+  updateRotationControl();
   $("#table-scroll").inert = paused;
 }
 function pause() {
@@ -677,17 +696,18 @@ $(".brand").addEventListener("click", (e) => {
   switchView("play", { showSetup: true });
 });
 function pieceMarkup(id, prefix) {
-  const { w, h } = geometry(game),
+  const { w, h, cw, ch } = geometry(game),
     t = target(game, id),
     path = piecePath(game, id),
     clip = `${prefix}-clip-${id}`;
-  return `<defs><clipPath id="${clip}"><path d="${path}"/></clipPath></defs><path d="${path}" fill="#f8f5e9"/><image href="${gameImageUrl}" x="${-t.x}" y="${-t.y}" width="${w}" height="${h}" preserveAspectRatio="none" clip-path="url(#${clip})"/><path class="piece-outline" d="${path}" fill="none" stroke="#153c5260" stroke-width="1.2" vector-effect="non-scaling-stroke"/>`;
+  return `<g transform="rotate(${pieceRotation(game, id) * 90} ${cw / 2} ${ch / 2})"><defs><clipPath id="${clip}"><path d="${path}"/></clipPath></defs><path d="${path}" fill="#f8f5e9"/><image href="${gameImageUrl}" x="${-t.x}" y="${-t.y}" width="${w}" height="${h}" preserveAspectRatio="none" clip-path="url(#${clip})"/><path class="piece-outline" d="${path}" fill="none" stroke="#153c5260" stroke-width="1.2" vector-effect="non-scaling-stroke"/></g>`;
 }
 function renderGame() {
   if (!game) return;
   renderBoard();
   renderTray();
   updateGameProgress();
+  updateRotationControl();
 }
 function renderBoard() {
   const { w, h, cw, ch, cols, rows } = geometry(game),
@@ -714,17 +734,21 @@ function renderBoard() {
   }
   board.innerHTML = markup;
 }
-function renderTray() {
+function trayPieceSvg(id, prefix) {
   const { cw, ch } = geometry(game),
     pad = Math.min(cw, ch) * 0.29,
-    ids = game.order.filter(
-      (id) => !game.pieces[id] && (!onlyEdges || edges(game, id).includes(0)),
-    );
+    box = pieceBounds(game, id);
+  return `<svg viewBox="${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}" aria-hidden="true">${pieceMarkup(id, prefix)}</svg>`;
+}
+function renderTray() {
+  const ids = game.order.filter(
+    (id) => !game.pieces[id] && (!onlyEdges || edges(game, id).includes(0)),
+  );
   $("#piece-tray").innerHTML =
     ids
       .map(
         (id) =>
-          `<button class="tray-piece ${selected === id ? "selected" : ""}" data-piece="${id}" aria-label="Select piece ${id + 1}" aria-pressed="${selected === id}"><svg viewBox="${-pad} ${-pad} ${cw + pad * 2} ${ch + pad * 2}" aria-hidden="true">${pieceMarkup(id, "tray")}</svg></button>`,
+          `<button class="tray-piece ${selected === id ? "selected" : ""}" data-piece="${id}" aria-label="Select piece ${id + 1}" aria-pressed="${selected === id}">${trayPieceSvg(id, "tray")}</button>`,
       )
       .join("") ||
     `<p style="grid-column:1/-1;padding:16px;font-size:14px;line-height:1.5">${onlyEdges ? "All edge pieces are on the table. Turn off “Edge pieces” to see the rest." : "All pieces are on the table. Keep joining them together!"}</p>`;
@@ -735,8 +759,34 @@ function updateTrayReturnState() {
   $(".tray-panel").classList.toggle("is-return-target", carrying);
   if (!drag?.moving) $(".tray-panel").classList.remove("is-drag-over");
   $("#clear-selection").hidden = !carrying;
+  $("#clear-selection").classList.toggle("with-preview", Boolean(carrying && game?.twist));
+  $("#clear-selection").innerHTML = `${carrying && game?.twist ? `<span class="tray-return-preview">${trayPieceSvg(selected, "held")}</span>` : ""}<span>put piece back</span>`;
   $("#piece-tray").inert = paused || carrying;
 }
+function updateRotationControl() {
+  $("#rotate-piece").disabled = !game?.twist || paused || selected === null || Boolean(drag) || Boolean(game.pieces[selected]?.locked);
+}
+async function rotateSelectedPiece(turns = 1) {
+  if (!game?.twist || paused || selected === null || drag || panMode) return;
+  const id = selected, count = rotateGroup(game, id, turns);
+  if (!count) return;
+  setPictureGuide(false);
+  if (game.pieces[id]) placeGroup(game, id);
+  const locked = game.pieces[id]?.locked;
+  if (locked) selected = null;
+  renderGame();
+  announce(locked ? "Nice snap! Pieces home." : `${count > 1 ? "Group" : "Piece"} rotated ${turns > 0 ? "clockwise" : "counterclockwise"}.`);
+  if (game.pieces.every((p) => p?.locked)) await completeGame();
+  else save();
+}
+$("#rotate-piece").addEventListener("click", () => rotateSelectedPiece());
+function rotationKey(event) {
+  if (event.key.toLowerCase() !== "r" || event.ctrlKey || event.metaKey || event.altKey || !game?.twist || selected === null || paused) return false;
+  event.preventDefault();
+  if (!event.repeat) rotateSelectedPiece(event.shiftKey ? -1 : 1);
+  return true;
+}
+$("#rotate-piece").addEventListener("keydown", rotationKey);
 function putPieceBack(id) {
   if (!game || paused || id === null || game.pieces[id]?.locked) return;
   const count = returnGroupToTray(game, id);
@@ -773,7 +823,7 @@ function selectPiece(id) {
   renderGame();
   if (selected !== null) {
     announce(
-      `Piece ${id + 1} selected. Tap the table to place it, or use arrow keys, then Enter.`,
+      `Piece ${id + 1} selected. Tap the table to place it, or use arrow keys, then Enter.${game.twist ? " Use Rotate or R to turn it; Shift+R turns it back." : ""}`,
     );
     $("#puzzle-board").focus({ preventScroll: true });
   }
@@ -818,7 +868,7 @@ function usePictureGuide() {
     ? `Achievement${unlocks.length === 1 ? "" : "s"} earned: ${unlocks.map((a) => `${a.name} (+${a.points.toLocaleString()} Snap Points)`).join(" · ")}.`
     : "";
   if (rewardMessage) toast(rewardMessage);
-  const award = score(game.difficulty, seconds(), game.guideUses);
+  const award = score(game.difficulty, seconds(), game.guideUses, game.twist);
   const guideMessage = award.total === 0
     ? "Picture guide shown. This puzzle will earn no points."
     : `Picture guide shown. ${award.guidePenalty.toLocaleString()} Snap Points deducted so far.`;
@@ -837,10 +887,10 @@ $("#reference-button").addEventListener("click", () => {
   const previewGame = game;
   pause();
   if (game !== previewGame) return;
-  const cost = pictureGuideCost(game.difficulty).toLocaleString();
+  const cost = pictureGuideCost(game.difficulty, game.twist).toLocaleString();
   let confirmed = false;
   modal(
-    `<h2>A little peek?</h2><p>Each use of Picture guide deducts <strong>${cost} Snap Points</strong> from this puzzle’s reward: 10% of its base points, rounded to the nearest whole point.</p><p>The preview disappears when you move a puzzle piece. Showing it again costs another ${cost} points. The reward cannot drop below zero.</p><p><strong>After 10 uses, this puzzle earns no points, including any time bonus.</strong> Points already earned in the Trophy Swamp stay yours.</p><button id="confirm-guide" class="button primary" type="button">Use Picture guide</button><button id="cancel-guide" class="button secondary" type="button">Keep puzzling</button>`,
+    `<h2>A little peek?</h2><p>Each use of Picture guide deducts <strong>${cost} Snap Points</strong> from this puzzle’s reward: 10% of the difficulty’s base points, rounded to the nearest whole point${game.twist ? ", then doubled for Twist" : ""}.</p><p>The preview disappears when you move or rotate a puzzle piece. Showing it again costs another ${cost} points. The reward cannot drop below zero.</p><p><strong>After 10 uses, this puzzle earns no points, including any time bonus.</strong> Points already earned in the Trophy Swamp stay yours.</p><button id="confirm-guide" class="button primary" type="button">Use Picture guide</button><button id="cancel-guide" class="button secondary" type="button">Keep puzzling</button>`,
   );
   $("#modal").addEventListener("close", () => {
     if (game !== previewGame || data.active !== previewGame) return;
@@ -925,6 +975,19 @@ function boundedLocation(x, y) {
   };
 }
 function positionPiece(id, x, y) {
+  if (game.twist) {
+    const piece = game.pieces[id];
+    if (piece) {
+      const dx = x - piece.x, dy = y - piece.y;
+      game.pieces.filter((p) => p && p.group === piece.group).forEach((p) => {
+        p.x += dx;
+        p.y += dy;
+      });
+    } else game.pieces[id] = { id, x, y, group: id, locked: false };
+    constrainGroup(game, id);
+    setPictureGuide(false);
+    return;
+  }
   const loc = boundedLocation(x, y),
     piece = game.pieces[id];
   if (piece) {
@@ -985,6 +1048,7 @@ function pointerDown(e) {
     original: game.pieces.map((p) => (p ? { ...p } : null)),
     moving: false,
   };
+  updateRotationControl();
 }
 function pointerMove(e) {
   if (!drag || e.pointerId !== drag.pointerId || !game) return;
@@ -1021,6 +1085,7 @@ async function pointerUp(e) {
   if (!drag || e.pointerId !== drag.pointerId) return;
   const old = drag;
   drag = null;
+  updateRotationControl();
   if (!old.moving) return;
   ignoreClick = true;
   setTimeout(() => (ignoreClick = false), 0);
@@ -1045,6 +1110,7 @@ function cancelDrag(e) {
     renderGame();
   }
   updateTrayReturnState();
+  updateRotationControl();
 }
 $("#piece-tray").addEventListener("pointerdown", pointerDown);
 $("#puzzle-board").addEventListener("pointerdown", pointerDown);
@@ -1072,6 +1138,7 @@ $("#puzzle-board").addEventListener("click", (e) => {
 });
 $("#puzzle-board").addEventListener("keydown", (e) => {
   if (!game || paused) return;
+  if (rotationKey(e)) return;
   if (e.key === "Escape") {
     cancelDrag();
     selected = null;
@@ -1129,7 +1196,7 @@ async function completeGame() {
   tick();
   const completed = game,
     previously = achievementProgress(data.records, data).earned,
-    award = score(completed.difficulty, completed.seconds, completed.guideUses);
+    award = score(completed.difficulty, completed.seconds, completed.guideUses, completed.twist);
   let thumbnail = null;
   try {
     thumbnail = (await prepareImage(completed.image, 260, 0.6)).image;
@@ -1143,6 +1210,7 @@ async function completeGame() {
       seconds: completed.seconds,
       points: award.total,
       guideUses: completed.guideUses || 0,
+      twist: completed.twist === true,
       date: new Date().toISOString(),
       thumbnail,
       resumed: completed.resumed,
@@ -1211,7 +1279,7 @@ function showCompletion({ completed, award, unlocks, achievementBonus, totalAwar
         <p class="win-memory">${safe(completed.name)}</p>
         <dl class="win-stats-list">
           <div><dt>Time</dt><dd>${formatTime(completed.seconds)}</dd></div>
-          <div><dt>Puzzle points</dt><dd>${award.base.toLocaleString()}</dd></div>
+          <div><dt>Puzzle points${completed.twist ? " (Twist 2×)" : ""}</dt><dd>${award.base.toLocaleString()}</dd></div>
           <div><dt>Time bonus</dt><dd>+${award.bonus.toLocaleString()}</dd></div>
           ${completed.guideUses ? `<div><dt>Picture guide (${completed.guideUses} ${completed.guideUses === 1 ? "use" : "uses"})</dt><dd>−${award.guidePenalty.toLocaleString()}</dd></div>` : ""}
           ${achievementBonus ? `<div><dt>Achievement bonus</dt><dd>+${achievementBonus.toLocaleString()}</dd></div>` : ""}
@@ -1259,7 +1327,7 @@ function renderGallery() {
               <h2>${safe(r.name)}</h2>
               <time class="trophy-date" datetime="${safe(r.date)}"><span class="sr-only">Completed </span>${date}</time>
               <div class="trophy-meta">
-                <span class="trophy-difficulty"><span class="sr-only">Difficulty: </span>${level.name}<span class="trophy-pieces"> · ${level.cols * level.rows} pieces</span></span>
+                <span class="trophy-difficulty"><span class="sr-only">Difficulty: </span>${level.name}<span class="trophy-pieces"> · ${level.cols * level.rows} pieces${r.twist ? " · Twist 2×" : ""}</span></span>
                 <span class="trophy-time"><span class="stat-icon icon-time" aria-hidden="true"></span><span class="sr-only">Time: </span>${formatTime(r.seconds)}</span>
               </div>
             </div>
@@ -1365,7 +1433,7 @@ $("#achievement-content").addEventListener("keydown", (event) => {
 $("#help-button").addEventListener("click", () => {
   if (game) pause();
   modal(
-    '<p class="eyebrow">MAKE YOURSELF AT HOME</p><h2>A few friendly pointers.</h2><ol class="help-list"><li>Choose a photo and a difficulty. Your photo keeps its original shape. Use the pencil beside the suggested name in step 3 to make it yours, or change it later beside the title during play.</li><li>Drag pieces from the tray onto the table. You can also tap a piece, then tap a spot on the table.</li><li>Matching neighbors snap into groups you can move together. Pieces lock when they reach their home in the frame.</li><li>Picture guide previews the photo until you move a piece. Each use costs 10% of the difficulty’s base points, rounded to the nearest whole point: 1, 3, 6, or 14 Snap Points. The first use asks you to confirm; after 10 uses, the puzzle earns no points, including any time bonus. Edge pieces filters the border pieces for free. Zoom offers 50%, 75%, Fit, 125%, 150%, and 200%. Fit shows the whole picture. Pan table lets you swipe around a zoomed table; turn it off to move pieces.</li><li>For keyboard play, select a piece with Enter, use arrow keys on the table, and press Enter to place. Escape puts the selection down.</li><li>The clock counts active play only. Pause anytime; hiding this tab pauses automatically.</li></ol><p>Each puzzle starts with base points and a time bonus of up to 50%, rounded to the nearest whole point. The bonus gradually reaches zero at 4, 10, 20, or 40 minutes, depending on difficulty. All Snap Points are whole numbers. Picture guide deductions cannot reduce this puzzle’s reward below zero; previously earned points stay yours.</p><p>Each Chomp Club achievement adds a one-time reward of 5–200 Snap Points, shown on its card. Already earned achievements count, too. Achievement rewards count toward point milestones and remain available even when a puzzle earns no points. Your total includes puzzle and achievement rewards.</p><p><strong>Your puzzle saves automatically in this browser</strong> after every move and regularly while you play. You can close the tab and return later. Select the snapscape logo to return to photo setup, or visit the Trophy Swamp and Chomp Club. Select <strong>Continue puzzle</strong> to pick up where you left off.</p><p>Use <strong>Options → Back up memories</strong> to keep a copy or move to another device.</p><p><strong>Choosing a photo:</strong> JPG, PNG, or WebP, up to 20 MB. HEIC/HEIF photos work only if your browser can open them; otherwise use a JPG copy.</p>',
+    '<p class="eyebrow">MAKE YOURSELF AT HOME</p><h2>A few friendly pointers.</h2><ol class="help-list"><li>Choose a photo and a difficulty. Your photo keeps its original shape. Use the pencil beside the suggested name in step 3 to make it yours, or change it later beside the title during play.</li><li>Drag pieces from the tray onto the table. You can also tap a piece, then tap a spot on the table.</li><li>Matching neighbors snap into groups you can move together. Pieces lock when they reach their home in the frame, facing upright.</li><li>Turn on Give it a twist before starting for randomly rotated pieces and double puzzle points. Select a piece, then use Rotate or press R to turn it 90° clockwise; Shift+R turns it back. Connected groups rotate together. Twist doubles base points, the rounded time bonus, and Picture guide costs; achievement rewards stay the same.</li><li>Picture guide previews the photo until you move a piece. Each use costs 10% of the difficulty’s base points, rounded to the nearest whole point: 1, 3, 6, or 14 Snap Points. The first use asks you to confirm; after 10 uses, the puzzle earns no points, including any time bonus. Edge pieces filters the border pieces for free. Zoom offers 50%, 75%, Fit, 125%, 150%, and 200%. Fit shows the whole picture. Pan table lets you swipe around a zoomed table; turn it off to move pieces.</li><li>For keyboard play, select a piece with Enter, use arrow keys on the table, and press Enter to place. Escape puts the selection down.</li><li>The clock counts active play only. Pause anytime; hiding this tab pauses automatically.</li></ol><p>Each puzzle starts with base points and a time bonus of up to 50%, rounded to the nearest whole point. The bonus gradually reaches zero at 4, 10, 20, or 40 minutes, depending on difficulty. All Snap Points are whole numbers. Picture guide deductions cannot reduce this puzzle’s reward below zero; previously earned points stay yours.</p><p>Each Chomp Club achievement adds a one-time reward of 5–200 Snap Points, shown on its card. Already earned achievements count, too. Achievement rewards count toward point milestones and remain available even when a puzzle earns no points. Your total includes puzzle and achievement rewards.</p><p><strong>Your puzzle saves automatically in this browser</strong> after every move and regularly while you play. You can close the tab and return later. Select the snapscape logo to return to photo setup, or visit the Trophy Swamp and Chomp Club. Select <strong>Continue puzzle</strong> to pick up where you left off.</p><p>Use <strong>Options → Back up memories</strong> to keep a copy or move to another device.</p><p><strong>Choosing a photo:</strong> JPG, PNG, or WebP, up to 20 MB. HEIC/HEIF photos work only if your browser can open them; otherwise use a JPG copy.</p>',
   );
 });
 const optionsToggle = $("#options-toggle"),

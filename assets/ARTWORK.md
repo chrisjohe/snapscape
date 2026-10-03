@@ -96,6 +96,12 @@ Constraints: one character only; no written YES or other text, no letters, logos
 
 Prompt: Create one original transparent game currency icon: a circular golden coin featuring this exact friendly alligator character’s head in the center. Match its charming editorial cut-paper illustration, subtly grainy paper texture, rounded shapes, forest-green skin, cream muzzle, warm toothy smile, and a tiny hint of orange neckerchief. Use a warm golden-orange raised rim and a cream-gold face. Make the gator head large and readable at 40–48 pixels. Mostly front-facing, slight dimensional depth, compact centered square composition, entire coin visible with modest transparent margin. No text, letters, numbers, sun, stars, extra coins, scenery, official sports logos, or watermark.
 
+## Twist portrait — `gator-twist.png`
+
+Generated with the built-in image-generation tool on 2 October 2026 from `mascot.png`. Saved as a new transparent 512 × 512 PNG; resized with macOS `sips`. Used beside the rotation option in the compact setup layout.
+
+Prompt: Use case: identity-preserve. Asset type: transparent mascot illustration for Snapscape's 'Give it a twist' puzzle rotation option. Edit the referenced mascot into a new pose, keeping exactly the same friendly green alligator character, orange neckerchief, cream belly, smiling face, textured storybook illustration style and colors. Show his upper body holding one large burnt-orange jigsaw puzzle piece between his two hands, tilted as if he is turning it, with one simple curved dark-green rotation arrow above the piece. Keep the face, hands, puzzle piece and arrow clear and readable at 64 pixels. Compact square composition, entire head and hands visible, tightly framed with a small safe transparent margin. Real transparent background, no ground shadow, no text, no lettering, no extra objects. Save as a new variant; do not change the reference file.
+
 ## Challenge portraits
 
 Generated with the built-in image-generation tool on 1 October 2026, using `mascot.png` as the character and style reference. Each was generated separately and saved as a 256 × 256 transparent PNG for the setup difficulty cards. The existing mascot remains the Snappy portrait.

@@ -12,6 +12,11 @@ import {
   piecePath,
   placeGroup,
   returnGroupToTray,
+  pieceRotation,
+  pieceBounds,
+  rotateVector,
+  rotateGroup,
+  constrainGroup,
   validateData,
   ACHIEVEMENTS,
   SAMPLE_SNAPSCAPES,
@@ -472,4 +477,111 @@ test("sample identities survive backup validation while legacy saves remain read
     assert.throws(() => validateData({ version: 1, active: { ...game(), ...identity }, records: [] }));
     assert.throws(() => validateData({ version: 1, active: null, records: [{ ...record, ...identity }] }));
   }
+});
+
+function twistGame(id = "breezy", ratio = 1.5) {
+  const g = game(id, ratio);
+  return { ...g, twist: true, rotations: Array(g.pieces.length).fill(0) };
+}
+const restoreTwist = (g) => validateData(JSON.parse(JSON.stringify({ version: 1, records: [], active: g }))).active;
+
+test("rotated pieces only lock upright and only join equally rotated neighbors", () => {
+  for (const turns of [1, 2, 3]) {
+    const g = twistGame(), { cw } = geometry(g);
+    g.rotations[0] = turns;
+    g.pieces[0] = { id: 0, x: 1, y: 1, group: 0, locked: false };
+    assert.equal(placeGroup(g, 0), 0);
+    assert.equal(g.pieces[0].locked, false);
+    g.pieces[0].x = 350;
+    g.pieces[0].y = 240;
+    const delta = rotateVector(cw, 0, turns);
+    g.pieces[1] = { id: 1, x: 350 + delta.x, y: 240 + delta.y, group: 1, locked: false };
+    placeGroup(g, 1);
+    assert.notEqual(g.pieces[1].group, g.pieces[0].group);
+    g.rotations[1] = turns;
+    g.pieces[1].x = g.pieces[0].x + delta.x;
+    g.pieces[1].y = g.pieces[0].y + delta.y;
+    placeGroup(g, 1);
+    assert.equal(g.pieces[1].group, g.pieces[0].group);
+    assert.equal(g.pieces[1].locked, false);
+    assert.deepEqual(restoreTwist(g).pieces, g.pieces);
+    rotateGroup(g, 0, -turns);
+    const dx = g.pieces[0].x, dy = g.pieces[0].y;
+    g.pieces.filter(Boolean).forEach((p) => { p.x -= dx; p.y -= dy; });
+    assert.equal(placeGroup(g, 0), 2);
+    assert.equal(rotateGroup(g, 0), 0);
+    assert.deepEqual(restoreTwist(g).pieces, g.pieces);
+  }
+});
+
+test("rotation preserves connected groups and saves for every photo shape and difficulty", () => {
+  for (const d of DIFFICULTIES) for (const ratio of [0.15, 0.6667, 1, 1.5, 3, 7]) {
+    const g = twistGame(d.id, ratio);
+    // A full loose group covers the hardest oversized case after a quarter turn.
+    g.pieces = g.pieces.map((_, id) => ({ id, ...target(g, id), group: 0, locked: false }));
+    for (let turn = 0; turn < 4; turn++) {
+      assert.equal(rotateGroup(g, 0), g.pieces.length);
+      const restored = restoreTwist(g);
+      assert.deepEqual(restored.rotations, g.rotations);
+      assert.deepEqual(restored.pieces, g.pieces);
+      const delta = rotateVector(geometry(g).cw, 0, (turn + 1) % 4);
+      assert.ok(Math.abs(g.pieces[1].x - g.pieces[0].x - delta.x) < 0.0001);
+      assert.ok(Math.abs(g.pieces[1].y - g.pieces[0].y - delta.y) < 0.0001);
+    }
+    const dx = g.pieces[0].x, dy = g.pieces[0].y;
+    g.pieces.forEach((p) => { p.x -= dx; p.y -= dy; });
+    assert.equal(placeGroup(g, 0), g.pieces.length);
+  }
+});
+
+test("tray return, rotation, and placement retain angles and fit rectangular pieces", () => {
+  for (const ratio of [0.15, 0.67, 1.5, 7]) {
+    const g = twistGame("breezy", ratio), { cw, ch, w, h } = geometry(g);
+    for (const turns of [0, 1, 2, 3]) {
+      g.rotations[2] = turns;
+      g.pieces[2] = { id: 2, x: w, y: h, group: 2, locked: false };
+      constrainGroup(g, 2);
+      const box = pieceBounds(g, 2);
+      assert.equal(box.width, turns % 2 ? ch : cw);
+      assert.equal(box.height, turns % 2 ? cw : ch);
+      assert.equal(restoreTwist(g).rotations[2], turns);
+      assert.equal(returnGroupToTray(g, 2), 1);
+      assert.equal(restoreTwist(g).rotations[2], turns);
+      assert.equal(rotateGroup(g, 2), 1);
+      assert.equal(restoreTwist(g).rotations[2], (turns + 1) % 4);
+    }
+  }
+});
+
+test("Twist doubles whole puzzle rewards and guide costs, with zero after ten guides", () => {
+  for (const d of DIFFICULTIES) for (const seconds of [0, 24.01, 60, d.target, d.target * 2]) {
+    for (const guides of [0, 1, 2, 9, 10, 11]) {
+      const normal = score(d.id, seconds, guides), twist = score(d.id, seconds, guides, true);
+      for (const key of Object.keys(normal)) assert.equal(twist[key], normal[key] * 2);
+      assert.equal(pictureGuideCost(d.id, true), pictureGuideCost(d.id) * 2);
+    }
+  }
+});
+
+test("legacy backups stay upright and malformed rotation or group state is rejected", () => {
+  const legacy = restoreTwist(game());
+  assert.equal(legacy.twist, false);
+  assert.ok(legacy.rotations.every((angle) => angle === 0));
+  assert.equal(pieceRotation(legacy, 0), 0);
+  const g = twistGame();
+  for (const twist of ["true", 1, null]) assert.throws(() => restoreTwist({ ...g, twist }));
+  for (const rotations of [undefined, null, [], Array(12).fill(4), Array(12).fill(-1), Array(12).fill(0.5), Array(12).fill("0")]) {
+    assert.throws(() => restoreTwist({ ...g, rotations }));
+  }
+  assert.throws(() => restoreTwist({ ...g, twist: false, rotations: Array(12).fill(1) }));
+  g.pieces[0] = { id: 0, x: 0, y: 0, group: 0, locked: true };
+  g.rotations[0] = 1;
+  assert.throws(() => restoreTwist(g));
+  g.pieces[0] = { id: 0, x: 100, y: 150, group: 0, locked: false };
+  g.pieces[1] = { id: 1, x: 100, y: 375, group: 0, locked: false };
+  assert.throws(() => restoreTwist(g));
+  g.rotations[1] = 1;
+  assert.doesNotThrow(() => restoreTwist(g));
+  g.pieces[1].x += 50;
+  assert.throws(() => restoreTwist(g));
 });

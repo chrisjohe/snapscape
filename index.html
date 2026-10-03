@@ -16,8 +16,8 @@
     <link rel="icon" href="./assets/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./assets/favicon-16.png" type="image/png" sizes="16x16" />
     <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png" sizes="180x180" />
-    <link rel="stylesheet" href="./styles.css?v=20261002-5" />
-    <script type="module" src="./app.js?v=20261002-9"></script>
+    <link rel="stylesheet" href="./styles.css?v=20261002-10" />
+    <script type="module" src="./app.js?v=20261002-10"></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to Puzzle Table</a>
@@ -176,16 +176,27 @@
                 <legend class="sr-only">Puzzle difficulty</legend>
                 <div id="difficulty-options" class="difficulty-options"></div>
               </fieldset>
-              <label class="rotation-option" title="coming soon">
-                <input
-                  id="random-rotation"
-                  type="checkbox"
-                  aria-describedby="rotation-coming-soon"
-                  disabled
-                />
-                <span>Randomly rotate puzzle pieces</span>
-              </label>
-              <span id="rotation-coming-soon" class="sr-only">coming soon</span>
+              <button
+                id="random-rotation"
+                class="rotation-option"
+                type="button"
+                aria-pressed="false"
+                aria-labelledby="rotation-title rotation-points"
+                aria-describedby="rotation-description"
+              >
+                <img class="rotation-gator" src="./assets/gator-twist.png" alt="" width="64" height="64" aria-hidden="true" />
+                <span class="rotation-copy">
+                  <strong id="rotation-title">Give it a twist!</strong>
+                  <span id="rotation-description">Randomly rotated pieces</span>
+                </span>
+                <span class="rotation-controls">
+                  <span id="rotation-points" class="rotation-points">
+                    2× <span class="sr-only">Snap Points</span>
+                    <img class="difficulty-coin" src="./assets/snap-coin.png" alt="" width="18" height="18" aria-hidden="true" />
+                  </span>
+                  <span class="rotation-switch" aria-hidden="true"></span>
+                </span>
+              </button>
             </section>
             <section
               class="setup-step launch-step"
@@ -370,6 +381,10 @@
               </div>
               <aside class="tray-panel" aria-label="Loose puzzle pieces">
                 <div class="tray-controls">
+                  <button id="rotate-piece" class="filter-button rotate-button" type="button" aria-label="Rotate selected piece clockwise (R)" title="Select a piece, then rotate it (R)" disabled hidden>
+                    <span class="rotate-icon" aria-hidden="true">↻</span>
+                    Rotate
+                  </button>
                   <button
                     id="edges-button"
                     class="filter-button"

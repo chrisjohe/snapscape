@@ -1143,3 +1143,101 @@ test("new completion milestones are announced on crossing their thresholds and o
     assert.equal(a.node("#modal-content").innerHTML.includes(achievement.name), false, id);
   }
 });
+
+function startTwist(a, difficulty = "breezy") {
+  a.node('[name=difficulty]:checked').value = difficulty;
+  a.node("#random-rotation").setAttribute("aria-pressed", "true");
+  a.run('selectedPhoto = { image: "data:image/jpeg;base64,AAAA", ratio: 1.5, ownPhoto: true }; startGame();');
+}
+
+test("Twist toggle starts random orientations, resumes them, and allows a normal next puzzle", async () => {
+  const a = app();
+  await a.node("#random-rotation").click();
+  assert.equal(a.node("#random-rotation").getAttribute("aria-pressed"), "true");
+  startTwist(a);
+  const saved = JSON.parse(a.storage.get(KEY)).active;
+  assert.equal(saved.twist, true);
+  assert.equal(saved.rotations.length, 12);
+  assert.ok(saved.rotations.some((angle) => angle !== 0));
+  assert.ok(saved.rotations.every((angle) => Number.isInteger(angle) && angle >= 0 && angle <= 3));
+  assert.equal(a.node("#rotate-piece").hidden, false);
+  assert.equal(a.node("#rotate-piece").disabled, true);
+  const resumed = app(a.storage);
+  resumed.run("resumeSavedGame();");
+  assert.deepEqual(JSON.parse(resumed.run("JSON.stringify(game.rotations)")), saved.rotations);
+  assert.equal(resumed.node("#rotate-piece").hidden, false);
+  a.run("leaveGame();");
+  await a.node("#random-rotation").click();
+  a.run("startGame();");
+  assert.equal(a.run("game.twist"), false);
+  assert.equal(a.run("game.rotations.every((angle) => angle === 0)"), true);
+  assert.equal(a.node("#rotate-piece").hidden, true);
+});
+
+test("Rotate and keyboard controls save angles, update the held preview, and respect pause and dragging", async () => {
+  const a = app();
+  startTwist(a);
+  a.run("game.rotations[2] = 0; selectPiece(2); setPictureGuide(true);");
+  assert.equal(a.node("#rotate-piece").disabled, false);
+  await a.node("#rotate-piece").click();
+  assert.equal(a.run("game.rotations[2]"), 1);
+  assert.equal(a.run("showGuide"), false);
+  assert.match(a.node("#clear-selection").innerHTML, /rotate\(90 /);
+  assert.equal(JSON.parse(a.storage.get(KEY)).active.rotations[2], 1);
+  await a.node("#puzzle-board").emit("keydown", { key: "R", shiftKey: true });
+  assert.equal(a.run("game.rotations[2]"), 0);
+  await a.node("#puzzle-board").emit("keydown", { key: "r", ctrlKey: true });
+  assert.equal(a.run("game.rotations[2]"), 0);
+  a.run("pause();");
+  await a.node("#rotate-piece").click();
+  assert.equal(a.run("game.rotations[2]"), 0);
+  a.run("resume(); drag = { pointerId: 1, moving: false }; updateRotationControl();");
+  assert.equal(a.node("#rotate-piece").disabled, true);
+  await a.node("#rotate-piece").click();
+  assert.equal(a.run("game.rotations[2]"), 0);
+  a.run("cancelDrag();");
+  await a.node("#rotate-piece").click();
+  assert.equal(a.run("game.rotations[2]"), 1);
+});
+
+test("a backwards piece stays loose on placement, then rotates home and persists its lock", async () => {
+  const a = app();
+  startTwist(a);
+  a.run("game.rotations[0] = 2; selectPiece(0); keyboardCell = 0;");
+  await a.node("#puzzle-board").emit("keydown", { key: "Enter" });
+  assert.equal(a.run("game.pieces[0].locked"), false);
+  a.run("selectPiece(0);");
+  await a.node("#rotate-piece").click();
+  assert.equal(a.run("game.pieces[0].locked"), false);
+  await a.node("#rotate-piece").click();
+  assert.equal(a.run("game.pieces[0].locked"), true);
+  assert.equal(a.run("selected"), null);
+  assert.equal(a.node("#rotate-piece").disabled, true);
+  const saved = engine.validateData(JSON.parse(a.storage.get(KEY))).active;
+  assert.equal(saved.pieces[0].locked, true);
+  assert.equal(saved.rotations[0], 0);
+});
+
+test("Twist guide costs, completed rewards, gallery and backup restores agree", async () => {
+  const a = app();
+  startTwist(a, "snappy");
+  await a.node("#reference-button").click();
+  assert.match(a.node("#modal-content").innerHTML, /6 Snap Points/);
+  assert.match(a.node("#modal-content").innerHTML, /doubled for Twist/);
+  await a.node("#confirm-guide").click();
+  a.run('elapsed = 60; runStart = performance.now(); prepareImage = async () => ({ image: "data:image/jpeg;base64,AAAA" });');
+  await a.run("completeGame();");
+  const saved = JSON.parse(a.storage.get(KEY)), record = saved.records.at(-1);
+  assert.equal(record.twist, true);
+  assert.equal(record.guideUses, 1);
+  assert.equal(record.points, engine.score("snappy", 60, 1).total * 2);
+  assert.match(a.node("#gallery-content").innerHTML, /Twist 2×/);
+  await a.node("#win-stats-button").click();
+  assert.match(a.node("#modal-content").innerHTML, /Puzzle points \(Twist 2×\)/);
+  assert.match(a.node("#modal-content").innerHTML, /−6/);
+  const restored = engine.validateData(saved);
+  assert.equal(restored.records.at(-1).points, record.points);
+  assert.equal(restored.records.at(-1).twist, true);
+  const expected = engine.achievementProgress(restored.records, restored).totalPoints;
+  assert.equal(Number(a.node("#total-points").textContent), expected);
+});

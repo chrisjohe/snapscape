@@ -623,6 +623,9 @@ input[type="text"] {
   border: 0;
   margin: 0;
 }
+.challenge-step {
+  container-type: inline-size;
+}
 .difficulty-options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -635,11 +638,12 @@ input[type="text"] {
   border: 1px solid var(--line);
   background: var(--paper);
   border-radius: 14px;
-  text-align: center;
-  padding: 40px 6px 14px;
-  display: flex;
+  text-align: left;
+  min-height: 126px;
+  padding: 36px 8px 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr);
   align-items: center;
-  flex-direction: column;
   gap: 4px;
   transition: background 150ms, border-color 150ms;
 }
@@ -678,37 +682,48 @@ input[type="text"] {
   outline-offset: 3px;
 }
 .difficulty-gator {
-  width: 88px;
-  height: 88px;
+  width: 100%;
+  max-width: 64px;
+  height: 64px;
   object-fit: contain;
-  margin-bottom: 2px;
+  justify-self: center;
 }
-.difficulty-option strong {
+.difficulty-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.difficulty-copy strong {
   font-size: 15px;
+  color: var(--ink);
 }
-.difficulty-option b {
+.difficulty-copy b {
   font-size: 21px;
   font-weight: 600;
   color: var(--ink);
 }
-.difficulty-option span {
+.difficulty-copy > span {
   font-size: 12px;
   color: var(--muted);
 }
-.difficulty-points {
-  position: absolute;
-  top: 10px;
-  left: -5px;
-  isolation: isolate;
+.difficulty-points,
+.rotation-points {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 17px 3px 10px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--green);
   font-size: 11px;
   line-height: 1.2;
   font-weight: 700;
   white-space: nowrap;
   color: var(--paper);
+}
+.difficulty-points {
+  position: absolute;
+  top: 8px;
+  left: 8px;
 }
 .difficulty-coin {
   display: block;
@@ -717,40 +732,102 @@ input[type="text"] {
   height: 18px;
   object-fit: contain;
 }
-.difficulty-points::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: var(--green);
-  clip-path: polygon(0 0, 100% 0, calc(100% - 7px) 50%, 100% 100%, 0 100%);
-}
-.difficulty-points::after {
-  content: "";
-  position: absolute;
-  top: 100%;
-  left: 0;
-  border-top: 4px solid #29412d;
-  border-left: 4px solid transparent;
-}
 .rotation-option {
-  display: flex;
+  position: relative;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  margin-top: 16px;
-  color: var(--muted);
-  font-size: 14px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  color: var(--ink);
+  text-align: left;
   line-height: 1.4;
-  opacity: 0.55;
-  cursor: not-allowed;
+  transition: background 150ms, border-color 150ms;
 }
-.rotation-option input {
-  flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
-  min-height: 0;
-  margin: 0;
-  pointer-events: none;
+.rotation-option:hover {
+  border-color: #96a48c;
+  background: #f4f5ec;
+}
+.rotation-option[aria-pressed="true"] {
+  border-color: var(--green);
+  box-shadow: inset 0 0 0 1px var(--green);
+  background: #edf0e6;
+}
+.rotation-gator {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+.rotation-copy {
+  display: grid;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.rotation-copy strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+.rotation-controls {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+.rotation-switch {
+  position: relative;
+  width: 32px;
+  height: 20px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--cream);
+}
+.rotation-switch::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 150ms;
+}
+.rotation-option[aria-pressed="true"] .rotation-switch {
+  background: var(--green);
+  border-color: var(--green);
+}
+.rotation-option[aria-pressed="true"] .rotation-switch::before {
+  background: white;
+  transform: translateX(12px);
+}
+@container (max-width: 300px) {
+  .difficulty-copy strong {
+    font-size: 12px;
+  }
+  .difficulty-copy > span {
+    font-size: 11px;
+  }
+  .difficulty-copy b {
+    display: block;
+    font-size: 19px;
+  }
+  .rotation-option {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    gap: 6px;
+    padding: 10px 8px;
+  }
+  .rotation-gator {
+    width: 44px;
+    height: 54px;
+  }
+  .rotation-copy strong {
+    font-size: 13px;
+  }
 }
 .launch-content {
   border-radius: 18px;
@@ -1288,6 +1365,13 @@ main:has(#game:not([hidden])) {
   flex: 0 0 auto;
   padding: 4px 8px 0;
 }
+.rotate-button {
+  margin-right: auto;
+}
+.rotate-icon {
+  font-size: 24px;
+  line-height: 1;
+}
 .filter-button {
   position: relative;
   isolation: isolate;
@@ -1380,6 +1464,28 @@ main:has(#game:not([hidden])) {
   padding: 10px 16px;
   border-radius: 999px;
   background: #fffffff0;
+}
+.tray-return.with-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.tray-return .tray-return-preview {
+  width: min(140px, 60%);
+  height: 120px;
+  max-height: calc(100% - 56px);
+  flex: 0 1 120px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.tray-return-preview svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 .tray-return:hover,
 .tray-return:focus-visible,
