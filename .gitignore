@@ -3,4 +3,5 @@ node_modules/
 *.log
 /ToDo.md
 /QA.md
+/TESTS.md
 /AGENTS.md
