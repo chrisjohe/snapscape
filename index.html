@@ -16,8 +16,8 @@
     <link rel="icon" href="./assets/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./assets/favicon-16.png" type="image/png" sizes="16x16" />
     <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png" sizes="180x180" />
-    <link rel="stylesheet" href="./styles.css?v=20261002-10" />
-    <script type="module" src="./app.js?v=20261002-10"></script>
+    <link rel="stylesheet" href="./styles.css?v=20261002-11" />
+    <script type="module" src="./app.js?v=20261002-11"></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to Puzzle Table</a>
@@ -212,45 +212,42 @@
                 </h2>
               </div>
               <div class="launch-content">
-                <img
-                  class="launch-symbol"
-                  src="./assets/snap-pieces.svg"
-                  alt=""
-                  aria-hidden="true"
-                  width="84"
-                  height="60"
-                />
-                <p id="launch-tagline" class="launch-tagline">A little chomp.<br />A lot of joy.</p>
-                <div id="setup-title" class="setup-title" hidden>
-                  <p id="setup-puzzle-name" class="launch-tagline"></p>
-                  <button
-                    id="edit-setup-name-button"
-                    class="button secondary icon-button"
-                    type="button"
-                    aria-label="Edit puzzle name"
-                    title="Edit puzzle name"
-                    aria-haspopup="dialog"
-                    aria-controls="modal"
-                    disabled
-                  >
-                    <span class="toolbar-icon icon-edit" aria-hidden="true"></span>
-                  </button>
+                <div class="launch-copy">
+                  <p id="launch-tagline" class="launch-tagline">A little chomp.<br />A lot of joy.</p>
+                  <div id="setup-title" class="setup-title" hidden>
+                    <p id="setup-puzzle-name" class="launch-tagline"></p>
+                    <button
+                      id="edit-setup-name-button"
+                      class="button secondary icon-button"
+                      type="button"
+                      aria-label="Edit puzzle name"
+                      title="Edit puzzle name"
+                      aria-haspopup="dialog"
+                      aria-controls="modal"
+                      disabled
+                    >
+                      <span class="toolbar-icon icon-edit" aria-hidden="true"></span>
+                    </button>
+                  </div>
+                  <p id="start-hint" class="start-hint" role="status">
+                    Choose a picture to get started.
+                  </p>
                 </div>
-                <p id="start-hint" class="start-hint" role="status">
-                  Choose a picture to get started.
-                </p>
                 <button
                   id="start-button"
-                  class="button primary start-button"
+                  class="button start-button"
                   aria-describedby="start-hint"
                   disabled
                 >
-                  Start puzzle <span class="toolbar-icon icon-play" aria-hidden="true"></span>
+                  <span class="start-play" aria-hidden="true">
+                    <span class="toolbar-icon icon-play"></span>
+                  </span>
+                  <span>Start puzzle</span>
                 </button>
               </div>
               <p class="timing-note">
                 <strong>Your pace. No time limit.</strong>
-                <span>Finish faster for up to 50% extra Snap Points, rounded to whole points.</span>
+                <span>Finish faster for up to 50% extra Snap Points.</span>
               </p>
             </section>
           </div>
