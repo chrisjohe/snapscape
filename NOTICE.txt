@@ -23,13 +23,17 @@ Guide and licensing: https://developers.google.com/fonts/docs/material_symbols
 Upstream license: https://github.com/google/material-design-icons/blob/master/LICENSE
 
 Bundled SVG assets in assets/:
+  360_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   auto_stories_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   bolt_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   bookmark_star_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   border_style_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   camera_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  close_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   crown_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  cyclone_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   delete_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  diamond_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   done_all_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   drag_pan_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   edit_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
@@ -37,13 +41,20 @@ Bundled SVG assets in assets/:
   extension_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   frame_inspect_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   grid_guides_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  home_pin_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  kid_star_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   leaderboard_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  money_bag_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  money_off_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   pause_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   pediatrics_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   play_arrow_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   preview_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  rotate_left_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  rotate_right_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   save_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   school_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  sentiment_dissatisfied_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   social_leaderboard_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   star_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   stars_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
@@ -52,6 +63,7 @@ Bundled SVG assets in assets/:
   trophy_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   upload_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   verified_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
+  visibility_off_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   waving_hand_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
 
 These icons are served locally and styled with CSS masks. The full Apache

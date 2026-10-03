@@ -22,7 +22,7 @@ import {
   ACHIEVEMENTS,
   SAMPLE_SNAPSCAPES,
   validateData,
-} from "./engine.js?v=20261002-18";
+} from "./engine.js?v=20261002-21";
 const $ = (s) => document.querySelector(s),
   KEY = "snapscape.v1";
 const PUZZLE_TITLES = [
@@ -64,6 +64,7 @@ const emptyData = () => ({
   records: [],
   active: null,
   guideUsed: false,
+  guideExhausted: false,
   revision: "",
 });
 let data = emptyData(),
@@ -890,6 +891,8 @@ function usePictureGuide() {
   const previously = achievementProgress(data.records, data).earned;
   game.guideUses = Math.min(Number.MAX_SAFE_INTEGER, (game.guideUses || 0) + 1);
   data.guideUsed = true;
+  const award = score(game.difficulty, seconds(), game.guideUses, game.twist);
+  if (award.total === 0) data.guideExhausted = true;
   // Save the charge immediately so leaving or reloading cannot reset it.
   save();
   if (game !== previewGame) return;
@@ -902,7 +905,6 @@ function usePictureGuide() {
     ? `Achievement${unlocks.length === 1 ? "" : "s"} earned: ${unlocks.map((a) => `${a.name} (+${a.points.toLocaleString()} Snap Points)`).join(" · ")}.`
     : "";
   if (rewardMessage) toast(rewardMessage);
-  const award = score(game.difficulty, seconds(), game.guideUses, game.twist);
   const guideMessage = award.total === 0
     ? "Picture guide shown. This puzzle will earn no points."
     : `Picture guide shown. ${award.guidePenalty.toLocaleString()} Snap Points deducted so far.`;

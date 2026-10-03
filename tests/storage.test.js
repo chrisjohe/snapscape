@@ -803,7 +803,7 @@ test("zero-point completions still award achievements once and replays only add 
   saved.records = [];
   saved.active.guideUses = 10;
   const a = app(new Map([[KEY, JSON.stringify(saved)]]));
-  assert.equal(a.node("#total-points").textContent, "5");
+  assert.equal(a.node("#total-points").textContent, "10");
   a.run(`game = data.active; elapsed = 60;
     game.pieces = game.pieces.map((_, id) => ({ id, group: id, ...target(game, id), locked: true }));
     prepareImage = async () => ({ image: "data:image/jpeg;base64,AAAA" });`);
@@ -813,8 +813,8 @@ test("zero-point completions still award achievements once and replays only add 
   assert.match(a.node("#modal-content").innerHTML, /<h4>First Chomp<\/h4>/);
   await a.node("#win-stats-button").click();
   assert.ok(a.node("#modal-content").innerHTML.includes("Achievement bonus</dt><dd>+30</dd>"));
-  assert.equal(a.node("#total-points").textContent, "35");
-  assert.equal(app(a.storage).node("#total-points").textContent, "35");
+  assert.equal(a.node("#total-points").textContent, "40");
+  assert.equal(app(a.storage).node("#total-points").textContent, "40");
 
   a.node('[name=difficulty]:checked').value = "breezy";
   a.run(`closeModal();
@@ -824,8 +824,8 @@ test("zero-point completions still award achievements once and replays only add 
   await a.run("completeGame();");
   assert.doesNotMatch(a.node("#modal-content").innerHTML, /achievement bonus|New achievements/);
   assert.ok(a.node("#modal-content").innerHTML.includes(`<span class="sr-only">+${(14).toLocaleString()}</span>`));
-  assert.equal(a.node("#total-points").textContent, (49).toLocaleString());
-  assert.equal(app(a.storage).node("#total-points").textContent, (49).toLocaleString());
+  assert.equal(a.node("#total-points").textContent, (54).toLocaleString());
+  assert.equal(app(a.storage).node("#total-points").textContent, (54).toLocaleString());
   assert.match(a.node("#announcement").textContent, /Puzzle complete!/);
   await a.node("#win-stats-button").click();
   assert.doesNotMatch(a.node("#modal-content").innerHTML, /Achievement bonus/);
@@ -887,7 +887,7 @@ test("score reels settle on the exact accessible reward, including zero and grou
 
 test("first guide use can unlock a point milestone and synchronizes totals, cards, and notifications", async () => {
   const saved = savedProgress();
-  saved.records = [["legend", 0], ["bold", 0], ["bold", 0], ["snappy", 2400]]
+  saved.records = [["legend", 4114], ["bold", 1200], ["bold", 0], ["snappy", 2400]]
     .map(([difficulty, seconds], i) => ({
       id: `guide-milestone-${i}`, name: "Memory", difficulty, seconds,
       points: engine.score(difficulty, seconds).total,
@@ -899,7 +899,7 @@ test("first guide use can unlock a point milestone and synchronizes totals, card
   await a.node("#reference-button").click();
   await a.node("#confirm-guide").click();
   assert.equal(a.node("#total-points").textContent, "525");
-  assert.equal(a.node("#achievement-count").textContent, "5");
+  assert.equal(a.node("#achievement-count").textContent, "6");
   assert.match(a.node("#toast").textContent, /A Little Guidance \(\+5 Snap Points\)/);
   assert.match(a.node("#toast").textContent, /Orange & Blue Ribbon \(\+25 Snap Points\)/);
   assert.match(a.node("#announcement").textContent, /Orange & Blue Ribbon/);
@@ -949,7 +949,7 @@ test("a random picture keeps its identity through renaming, resume, completion, 
   assert.equal(imported.records[0].sampleId, sampleId);
   assert.equal(explorer.progress(imported.records), "1 / 12 pictures");
   assert.match(restored.node("#achievement-content").innerHTML, /1 \/ 12 pictures/);
-  assert.match(restored.node("#achievement-progress").innerHTML, /of 14 achievements earned/);
+  assert.match(restored.node("#achievement-progress").innerHTML, /of 20 achievements earned/);
 });
 
 test("replacing a sample with an upload clears its identity even when the filename matches", async () => {
@@ -1044,7 +1044,7 @@ test("the first guide achievement unlocks immediately, survives replacement and 
   assert.equal(reloaded.run("data.guideUsed"), true);
   assert.equal(reloaded.node("#achievement-count").textContent, "1");
   assert.equal(reloaded.node("#total-points").textContent, "5");
-  assert.match(reloaded.node("#achievement-progress").innerHTML, /<strong>1<\/strong> of 14/);
+  assert.match(reloaded.node("#achievement-progress").innerHTML, /<strong>1<\/strong> of 20/);
 
   reloaded.run(`resumeSavedGame();
     game.pieces = game.pieces.map((_, id) => ({ id, group: id, ...target(game, id), locked: true }));
@@ -1061,6 +1061,77 @@ test("the first guide achievement unlocks immediately, survives replacement and 
   assert.equal(reloaded.storage.has(KEY), false);
 });
 
+test("Peek-a-Broke unlocks at zero reward during play and survives replacement, backup, and reload until erasure", async () => {
+  for (const [difficulty, seconds, twist, threshold] of [
+    ["breezy", 0, false, 10], ["snappy", 1200, false, 9], ["snappy", 1200, true, 9],
+  ]) {
+    const a = app(new Map());
+    a.node('[name=difficulty]:checked').value = difficulty;
+    a.node("#random-rotation").setAttribute("aria-pressed", String(twist));
+    a.run('showPhoto({ image: "data:image/jpeg;base64,AAAA", ratio: 1.5, ownPhoto: false }); startGame();');
+    a.run(`elapsed = ${seconds};`);
+    await a.node("#reference-button").click();
+    await a.node("#cancel-guide").click();
+    assert.equal(a.run("data.guideExhausted"), false);
+    await a.node("#reference-button").click();
+    await a.node("#confirm-guide").click();
+    for (let use = 2; use <= threshold; use++) {
+      assert.equal(a.run("data.guideExhausted"), false);
+      assert.equal(a.node("#total-points").textContent, "5");
+      await a.node("#reference-button").click();
+      await a.node("#reference-button").click();
+    }
+    assert.equal(a.run("game.guideUses"), threshold);
+    assert.equal(JSON.parse(a.storage.get(KEY)).guideExhausted, true);
+    assert.equal(a.node("#total-points").textContent, "10");
+    assert.match(a.node("#toast").textContent, /Achievement earned: Peek-a-Broke \(\+5 Snap Points\)/);
+    assert.match(a.node("#announcement").textContent, /This puzzle will earn no points/);
+    assert.match(a.node("#achievement-content").innerHTML, /<article class="achievement-card unlocked">(?:(?!<\/article>)[\s\S])*<h2>Peek-a-Broke<\/h2>/);
+    a.node("#toast").textContent = "No new achievement";
+    await a.node("#reference-button").click();
+    await a.node("#reference-button").click();
+    assert.equal(a.node("#toast").textContent, "No new achievement");
+    assert.equal(a.node("#total-points").textContent, "10");
+
+    a.run('showPhoto({ image: "data:image/jpeg;base64,AAAA", ratio: 1.5, ownPhoto: false }); startGame();');
+    assert.equal(a.run("game.guideUses"), 0);
+    await a.node("#export-button").click();
+    const backup = await a.blobs.at(-1).text();
+    const restored = app(new Map());
+    restored.run("loadImage = async () => ({});");
+    await restored.node("#import-input").emit("change", {
+      target: { files: [{ size: backup.length, text: async () => backup }], value: "" },
+    });
+    await restored.node("#confirm-import").click();
+    const reloaded = app(restored.storage);
+    assert.equal(reloaded.run("data.guideExhausted"), true);
+    assert.equal(reloaded.node("#total-points").textContent, "10");
+    assert.equal(reloaded.node("#achievement-count").textContent, "2");
+    await reloaded.node("#erase-button").click();
+    await reloaded.node("#confirm-erase").click();
+    assert.equal(reloaded.run("data.guideExhausted"), false);
+    assert.equal(reloaded.node("#achievement-count").textContent, "0");
+    assert.equal(reloaded.storage.has(KEY), false);
+  }
+});
+
+test("a guide reward exhausted by a fading time bonus is recognized at completion", async () => {
+  const a = app(new Map());
+  a.node('[name=difficulty]:checked').value = "snappy";
+  a.run(`showPhoto({ image: "data:image/jpeg;base64,AAAA", ratio: 1.5, ownPhoto: false }); startGame();
+    elapsed = 600; game.guideUses = 9; data.guideUsed = true; save(); updateAll();`);
+  assert.equal(a.run("data.guideExhausted"), false);
+  assert.equal(a.node("#total-points").textContent, "5");
+  a.run(`elapsed = 1200;
+    game.pieces = game.pieces.map((_, id) => ({ id, group: id, ...target(game, id), locked: true }));
+    prepareImage = async () => ({ image: "data:image/jpeg;base64,AAAA" });`);
+  await a.run("completeGame();");
+  assert.match(a.node("#modal-content").innerHTML, /<h4>Peek-a-Broke<\/h4>/);
+  assert.match(a.node("#modal-content").innerHTML, /<span class="sr-only">\+15<\/span>/);
+  assert.equal(a.node("#total-points").textContent, "20");
+  assert.equal(app(a.storage).node("#total-points").textContent, "20");
+});
+
 test("achievement details flip independently, dismiss with Escape, and preserve earned progress", async () => {
   const a = app(), before = a.storage.get(KEY);
   const count = a.node("#achievement-count").textContent;
@@ -1069,6 +1140,7 @@ test("achievement details flip independently, dismiss with Escape, and preserve 
   assert.equal(markup.length, engine.ACHIEVEMENTS.length);
   for (const [i, [html]] of markup.entries()) {
     const [front, back] = html.split('<div class="achievement-face achievement-back"');
+    assert.ok(front.includes(`--achievement-icon: url('./assets/${engine.ACHIEVEMENTS[i].icon}_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg')`));
     assert.doesNotMatch(front, /achievement-reward|snap-coin\.png/);
     assert.ok(back.includes(`<span class="achievement-reward"><span class="achievement-points"><span>+${engine.ACHIEVEMENTS[i].points.toLocaleString()}</span>`));
     assert.match(back, /<img class="achievement-coin" src="\.\/assets\/snap-coin\.png" alt="Snap Points" width="20" height="20">/);
@@ -1108,7 +1180,7 @@ test("achievement details flip independently, dismiss with Escape, and preserve 
   assert.equal(a.storage.get(KEY), before);
 });
 
-test("existing completed history unlocks all five added achievements on load", () => {
+test("existing completed history unlocks its milestones and unguided Legend achievement on load", () => {
   const saved = savedProgress();
   saved.records = Array.from({ length: 50 }, (_, i) => {
     const difficulty = engine.DIFFICULTIES[i % 4].id, guideUses = i === 0 ? 1 : 0;
@@ -1122,12 +1194,32 @@ test("existing completed history unlocks all five added achievements on load", (
   const unlocked = [...a.node("#achievement-content").innerHTML.matchAll(
     /<article class="achievement-card unlocked">[\s\S]*?<h2>([^<]+)<\/h2>/g,
   )].map((match) => match[1]);
-  for (const name of ["A Little Guidance", "Swamp Regular", "Chomp Champion", "Golden Gator", "Every Kind of Chomp"]) {
+  for (const name of ["A Little Guidance", "Swamp Regular", "Chomp Champion", "Golden Gator", "Every Kind of Chomp", "Look Ma, No Peeks!"]) {
     assert.ok(unlocked.includes(name), name);
   }
   assert.ok(unlocked.includes("Quick on the Chomp"));
-  assert.equal(a.node("#achievement-count").textContent, "11");
-  assert.match(a.node("#achievement-progress").innerHTML, /<strong>11<\/strong> of 14/);
+  assert.equal(a.node("#achievement-count").textContent, "12");
+  assert.match(a.node("#achievement-progress").innerHTML, /<strong>12<\/strong> of 20/);
+});
+
+test("older completed history earns the Twist, zero-point, and 5,000-point achievements on load", () => {
+  const saved = savedProgress();
+  saved.records = Array.from({ length: 40 }, (_, i) => ({
+    id: `old-legend-finish-${i}`, name: "Old memory", difficulty: "legend",
+    seconds: 0, twist: i === 0, guideUses: i === 0 ? 10 : 0,
+    date: "2026-10-01T12:00:00Z", thumbnail: null,
+  }));
+  const a = app(new Map([[KEY, JSON.stringify(saved)]]));
+  const unlocked = [...a.node("#achievement-content").innerHTML.matchAll(
+    /<article class="achievement-card unlocked">[\s\S]*?<h2>([^<]+)<\/h2>/g,
+  )].map((match) => match[1]);
+  for (const name of ["Plot Twist", "Peek-a-Broke", "Swamp Tycoon", "Golden Gator"]) {
+    assert.ok(unlocked.includes(name), name);
+  }
+  const restored = engine.validateData(saved);
+  const total = engine.achievementProgress(restored.records, restored).totalPoints;
+  assert.equal(a.node("#total-points").textContent, total.toLocaleString());
+  assert.equal(app(a.storage).node("#total-points").textContent, total.toLocaleString());
 });
 
 test("new completion milestones are announced on crossing their thresholds and only once", async () => {
@@ -1140,9 +1232,10 @@ test("new completion milestones are announced on crossing their thresholds and o
     ["twenty-five", Array.from({ length: 24 }, (_, i) => record("breezy", i))],
     ["fifty", Array.from({ length: 49 }, (_, i) => record("breezy", i))],
     ["points-5000", [
-      ...Array.from({ length: 3 }, (_, i) => record("legend", i, 0)),
+      ...Array.from({ length: 2 }, (_, i) => record("legend", i, 0)), record("legend", 2, 4800),
       record("legend", 3, 2880), record("bold", 4),
     ]],
+    ["points-5k", Array.from({ length: 32 }, (_, i) => record("legend", i, i === 0 ? 2060 : i === 1 ? 343 : 4800))],
     ["all-difficulties", [record("snappy", 0), record("bold", 1), record("legend", 2)]],
   ];
   for (const [id, records] of cases) {
@@ -1173,6 +1266,44 @@ function startTwist(a, difficulty = "breezy") {
   a.node("#random-rotation").setAttribute("aria-pressed", "true");
   a.run('selectedPhoto = { image: "data:image/jpeg;base64,AAAA", ratio: 1.5, ownPhoto: true }; startGame();');
 }
+
+test("Twist milestones and an unguided Legend finish award once and survive backup restore", async () => {
+  const a = app(new Map());
+  const milestones = ["Full Circle", "Twist and Shout", "Look Ma, No Peeks!"];
+  for (const [index, difficulty] of ["breezy", "snappy", "bold", "legend", "legend", "legend"].entries()) {
+    startTwist(a, difficulty);
+    if (index < 4) {
+      await a.node("#reference-button").click();
+      await a.node("#confirm-guide").click();
+    }
+    a.run(`elapsed = 2400; game.rotations.fill(0);
+      game.pieces = game.pieces.map((_, id) => ({ id, group: id, ...target(game, id), locked: true }));
+      prepareImage = async () => ({ image: "data:image/jpeg;base64,AAAA" });`);
+    await a.run("completeGame();");
+    const expectedUnlocks = index === 3 ? ["Full Circle"] : index === 4 ? ["Twist and Shout", "Look Ma, No Peeks!"] : [];
+    for (const name of milestones) {
+      assert.equal(a.node("#modal-content").innerHTML.includes(`<h4>${name}</h4>`), expectedUnlocks.includes(name), name);
+    }
+    const saved = engine.validateData(JSON.parse(a.storage.get(KEY)));
+    assert.equal(a.node("#total-points").textContent, engine.achievementProgress(saved.records, saved).totalPoints.toLocaleString());
+    a.run("closeModal();");
+  }
+  const before = a.node("#total-points").textContent;
+  await a.node("#export-button").click();
+  const backup = await a.blobs.at(-1).text();
+  const restored = app(new Map());
+  restored.run("loadImage = async () => ({});");
+  await restored.node("#import-input").emit("change", {
+    target: { files: [{ size: backup.length, text: async () => backup }], value: "" },
+  });
+  await restored.node("#confirm-import").click();
+  const reloaded = app(restored.storage);
+  assert.equal(reloaded.node("#total-points").textContent, before);
+  const unlocked = [...reloaded.node("#achievement-content").innerHTML.matchAll(
+    /<article class="achievement-card unlocked">[\s\S]*?<h2>([^<]+)<\/h2>/g,
+  )].map((match) => match[1]);
+  for (const name of milestones) assert.ok(unlocked.includes(name), name);
+});
 
 test("Twist toggle starts random orientations, resumes them, and allows a normal next puzzle", async () => {
   const a = app();
@@ -1353,6 +1484,8 @@ test("Twist guide costs, completed rewards, gallery and backup restores agree", 
   assert.equal(record.twist, true);
   assert.equal(record.guideUses, 1);
   assert.equal(record.points, engine.score("snappy", 60, 1).total * 2);
+  assert.match(a.node("#modal-content").innerHTML, /<h4>Plot Twist<\/h4>/);
+  assert.match(a.node("#modal-content").innerHTML, /--achievement-icon: url\('\.\/assets\/rotate_right_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg'\)/);
   assert.match(a.node("#gallery-content").innerHTML, /Twist 2×/);
   await a.node("#win-stats-button").click();
   assert.match(a.node("#modal-content").innerHTML, /Puzzle points \(Twist 2×\)/);

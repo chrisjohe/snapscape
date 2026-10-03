@@ -277,14 +277,24 @@ export const collectedPoints = (records) =>
   records.reduce((sum, record) => sum + Math.round(record.points), 0);
 const completedDifficultyCount = (records) =>
   DIFFICULTIES.filter((d) => records.some((r) => r.difficulty === d.id)).length;
+const completedTwistCount = (records) => records.filter((r) => r.twist === true).length;
+const completedTwistDifficultyCount = (records) =>
+  completedDifficultyCount(records.filter((r) => r.twist === true));
+const completedUnguidedLegend = (records) =>
+  records.some((r) => r.difficulty === "legend" && (r.guideUses === 0 || r.guideUses === undefined));
 const usedPictureGuide = (records, state = {}) =>
   state.guideUsed === true || state.active?.guideUses > 0 || records.some((r) => r.guideUses > 0);
+const exhaustedPuzzlePoints = (puzzle) =>
+  puzzle?.guideUses > 0 && difficulty(puzzle.difficulty) &&
+  score(puzzle.difficulty, puzzle.seconds, puzzle.guideUses, puzzle.twist).total === 0;
+const exhaustedPictureGuide = (records, state = {}) =>
+  state.guideExhausted === true || records.some(exhaustedPuzzlePoints);
 export const ACHIEVEMENTS = [
   {
     id: "first",
     points: 10,
     name: "First Chomp",
-    icon: "pediatrics",
+    icon: "kid_star",
     description: "Finish your very first puzzle.",
     test: (r) => r.length >= 1,
     progress: (r) => `${Math.min(1, r.length)} / 1 puzzle`,
@@ -293,10 +303,19 @@ export const ACHIEVEMENTS = [
     id: "guide",
     points: 5,
     name: "A Little Guidance",
-    icon: "support",
-    description: "Use Picture guide for the first time.",
+    icon: "preview",
+    description: "Even a gator peeks. Try your first Picture guide.",
     test: usedPictureGuide,
     progress: () => "Take your first peek with Picture guide.",
+  },
+  {
+    id: "guide-zero",
+    points: 5,
+    name: "Peek-a-Broke",
+    icon: "money_off",
+    description: "Peek away every last puzzle point. Oops.",
+    test: exhaustedPictureGuide,
+    progress: () => "Reach 0 puzzle points with Picture guide.",
   },
   {
     id: "later",
@@ -326,6 +345,24 @@ export const ACHIEVEMENTS = [
     progress: () => "Targets: 4, 10, 20, or 40 minutes.",
   },
   {
+    id: "twist",
+    points: 25,
+    name: "Plot Twist",
+    icon: "rotate_right",
+    description: "Turn things around. Finish your first Twist puzzle.",
+    test: (r) => r.some((x) => x.twist === true),
+    progress: (r) => `${r.some((x) => x.twist === true) ? 1 : 0} / 1 Twist puzzle`,
+  },
+  {
+    id: "twist-five",
+    points: 50,
+    name: "Twist and Shout",
+    icon: "cyclone",
+    description: "Five Twist puzzles down. Take a victory spin.",
+    test: (r) => completedTwistCount(r) >= 5,
+    progress: (r) => `${Math.min(5, completedTwistCount(r))} / 5 Twist puzzles`,
+  },
+  {
     id: "scholar",
     points: 25,
     name: "Swamp Scholar",
@@ -347,8 +384,8 @@ export const ACHIEVEMENTS = [
     id: "twenty-five",
     points: 100,
     name: "Swamp Regular",
-    icon: "bookmark_star",
-    description: "Finish 25 puzzles.",
+    icon: "home_pin",
+    description: "Twenty-five puzzles in, and the swamp knows your name.",
     test: (r) => r.length >= 25,
     progress: (r) => `${Math.min(25, r.length)} / 25 puzzles`,
   },
@@ -357,7 +394,7 @@ export const ACHIEVEMENTS = [
     points: 200,
     name: "Chomp Champion",
     icon: "trophy",
-    description: "Finish 50 puzzles.",
+    description: "Fifty puzzles finished. Now that’s a winning bite.",
     test: (r) => r.length >= 50,
     progress: (r) => `${Math.min(50, r.length)} / 50 puzzles`,
   },
@@ -373,14 +410,25 @@ export const ACHIEVEMENTS = [
       `${Math.min(500, achievementProgress(r, state).totalPoints).toLocaleString()} / 500 points`,
   },
   {
+    // Keep Golden Gator’s legacy ID; its target was lowered to 1,000.
     id: "points-5000",
     points: 50,
     pointTarget: 1000,
     name: "Golden Gator",
-    icon: "star",
-    description: "Collect 1,000 Snap Points.",
+    icon: "diamond",
+    description: "Stash 1,000 Snap Points. The gators guard the gold.",
     test: (r, state) => achievementProgress(r, state).totalPoints >= 1000,
     progress: (r, state) => `${Math.min(1000, achievementProgress(r, state).totalPoints).toLocaleString()} / ${(1000).toLocaleString()} points`,
+  },
+  {
+    id: "points-5k",
+    points: 200,
+    pointTarget: 5000,
+    name: "Swamp Tycoon",
+    icon: "money_bag",
+    description: "Bank 5,000 Snap Points. Quite the gator nest egg.",
+    test: (r, state) => achievementProgress(r, state).totalPoints >= 5000,
+    progress: (r, state) => `${Math.min(5000, achievementProgress(r, state).totalPoints).toLocaleString()} / ${(5000).toLocaleString()} points`,
   },
   {
     id: "legend",
@@ -392,20 +440,38 @@ export const ACHIEVEMENTS = [
     progress: () => "Your biggest challenge awaits.",
   },
   {
+    id: "legend-no-guide",
+    points: 75,
+    name: "Look Ma, No Peeks!",
+    icon: "visibility_off",
+    description: "Finish Legend without Picture guide. All bite, no peek.",
+    test: completedUnguidedLegend,
+    progress: (r) => `${completedUnguidedLegend(r) ? 1 : 0} / 1 Legend puzzle without peeks`,
+  },
+  {
     id: "all-difficulties",
     points: 75,
     name: "Every Kind of Chomp",
     icon: "done_all",
-    description: "Finish at least one puzzle on every difficulty.",
+    description: "All four difficulties. A bite of everything.",
     test: (r) => completedDifficultyCount(r) === DIFFICULTIES.length,
     progress: (r) => `${completedDifficultyCount(r)} / ${DIFFICULTIES.length} difficulties`,
+  },
+  {
+    id: "twist-all-difficulties",
+    points: 100,
+    name: "Full Circle",
+    icon: "360",
+    description: "Finish all four difficulties with a Twist. What a turn.",
+    test: (r) => completedTwistDifficultyCount(r) === DIFFICULTIES.length,
+    progress: (r) => `${completedTwistDifficultyCount(r)} / ${DIFFICULTIES.length} difficulties with Twist`,
   },
   {
     id: "explorer",
     points: 100,
     name: "Sunshine Explorer",
     icon: "explore",
-    description: `Finish all ${SAMPLE_SNAPSCAPES.length} included pictures on any difficulty.`,
+    description: `Finish all ${SAMPLE_SNAPSCAPES.length} included pictures. Soak up the sunshine.`,
     test: (r) => completedSampleCount(r) === SAMPLE_SNAPSCAPES.length,
     progress: (r) => `${completedSampleCount(r)} / ${SAMPLE_SNAPSCAPES.length} pictures`,
   },
@@ -452,6 +518,7 @@ export function validateData(value) {
     !value ||
     value.version !== 1 ||
     (value.guideUsed !== undefined && typeof value.guideUsed !== "boolean") ||
+    (value.guideExhausted !== undefined && typeof value.guideExhausted !== "boolean") ||
     !Array.isArray(value.records) ||
     value.records.length > 10000
   )
@@ -619,7 +686,8 @@ export function validateData(value) {
     version: 1,
     records,
     active,
-    guideUsed: usedPictureGuide(records, { guideUsed: value.guideUsed, active }),
+    guideUsed: value.guideExhausted === true || usedPictureGuide(records, { guideUsed: value.guideUsed, active }),
+    guideExhausted: exhaustedPictureGuide(records, value) || Boolean(exhaustedPuzzlePoints(active)),
     revision: typeof value.revision === "string" ? value.revision : "",
   };
 }

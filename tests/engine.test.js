@@ -217,10 +217,9 @@ test("scores remain whole and nonnegative across times, difficulties, and guide 
 });
 test("point milestones include whole achievement rewards and cannot fund their own unlock", () => {
   assert.equal(collectedPoints([{ points: 363 }, { points: 13.8 }, { points: 12.8 }]), 390);
-  for (const [id, target] of [["points", 500], ["points-5000", 1000]]) {
+  for (const [id, target, priorRewards] of [["points", 500, 10], ["points-5000", 1000, 35], ["points-5k", 5000, 85]]) {
     const achievement = ACHIEVEMENTS.find((a) => a.id === id);
     assert.equal(achievement.pointTarget, target);
-    const priorRewards = id === "points" ? 10 : 35;
     const records = [{ difficulty: "breezy", seconds: 2400, points: target - priorRewards - 1 }];
     assert.equal(achievementProgress(records).totalPoints, target - 1);
     assert.equal(achievement.test(records), false);
@@ -301,7 +300,7 @@ test("an outdated active grid is discarded while completed records use only thei
   }
 });
 test("achievements are derived from completed puzzles and include resumed and own photos", () => {
-  assert.equal(ACHIEVEMENTS.length, 14);
+  assert.equal(ACHIEVEMENTS.length, 20);
   assert.equal(ACHIEVEMENTS.filter((a) => a.test([])).length, 0);
   const record = {
     difficulty: "breezy",
@@ -331,7 +330,8 @@ test("Golden Gator counts earned points after guide deductions and unlocks at ex
     difficulty, seconds, guideUses, points: score(difficulty, seconds, guideUses).total,
   });
   const records = [
-    ...Array.from({ length: 4 }, () => record("legend", 0)), record("bold", 2400, 6),
+    ...Array.from({ length: 3 }, () => record("legend", 0)),
+    record("legend", 4180, 1), record("bold", 2400, 6),
   ];
   assert.equal(achievement.test(records), false);
   assert.equal(achievement.progress(records), `999 / ${(1000).toLocaleString()} points`);
@@ -362,8 +362,112 @@ test("achievement rewards are derived once, including zero-point finishes and re
 
   const guided = achievementProgress([{ ...records[0], guideUses: 10, points: 0 }]);
   assert.equal(guided.puzzlePoints, 0);
-  assert.equal(guided.achievementPoints, 35);
-  assert.equal(guided.totalPoints, 35);
+  assert.equal(guided.achievementPoints, 40);
+  assert.equal(guided.totalPoints, 40);
+});
+
+test("Plot Twist requires a completed Twist puzzle and grants its reward only once", () => {
+  const achievement = ACHIEVEMENTS.find((a) => a.id === "twist");
+  const record = { difficulty: "breezy", seconds: 2400, points: 0, guideUses: 10 };
+  assert.equal(achievement.test([], { active: { ...record, twist: true } }), false);
+  assert.equal(achievement.test([record, { ...record, twist: false }]), false);
+  assert.equal(achievement.progress([record]), "0 / 1 Twist puzzle");
+  const twisted = { ...record, twist: true };
+  assert.equal(achievement.test([twisted]), true);
+  assert.equal(achievement.progress([twisted, twisted]), "1 / 1 Twist puzzle");
+  const earned = achievementProgress([twisted]);
+  assert.equal(earned.achievementPoints, achievementProgress([record]).achievementPoints + 25);
+  assert.equal(achievementProgress([twisted, twisted]).achievementPoints, earned.achievementPoints);
+});
+
+test("Look Ma, No Peeks! requires an unguided Legend finish, including legacy saves and Twist", () => {
+  const achievement = ACHIEVEMENTS.find((a) => a.id === "legend-no-guide");
+  assert.equal(achievement.test([], { active: { difficulty: "legend", guideUses: 0 } }), false);
+  for (const difficulty of DIFFICULTIES.map((d) => d.id)) {
+    for (const twist of [false, true]) {
+      for (const guideUses of [undefined, 0, 1, 9, 10]) {
+        const records = [{ difficulty, twist, guideUses }];
+        const qualifies = difficulty === "legend" && (guideUses === 0 || guideUses === undefined);
+        assert.equal(achievement.test(records), qualifies);
+        assert.equal(achievement.progress(records), `${qualifies ? 1 : 0} / 1 Legend puzzle without peeks`);
+      }
+    }
+  }
+  assert.equal(achievement.test([{ difficulty: "legend", guideUses: 1 }, { difficulty: "breezy", guideUses: 0 }]), false);
+});
+
+test("Twist and Shout counts only completed Twist puzzles and caps progress at five", () => {
+  const achievement = ACHIEVEMENTS.find((a) => a.id === "twist-five");
+  for (const count of [0, 1, 4, 5, 6]) {
+    const records = [
+      ...Array.from({ length: count }, () => ({ difficulty: "breezy", twist: true, guideUses: 10, points: 0 })),
+      ...Array.from({ length: 10 }, () => ({ difficulty: "breezy", twist: false })),
+      { difficulty: "breezy" },
+    ];
+    assert.equal(achievement.test(records, { active: { twist: true } }), count >= 5);
+    assert.equal(achievement.progress(records), `${Math.min(5, count)} / 5 Twist puzzles`);
+  }
+});
+
+test("Full Circle needs a Twist finish on each distinct difficulty", () => {
+  const achievement = ACHIEVEMENTS.find((a) => a.id === "twist-all-difficulties");
+  const records = DIFFICULTIES.map(({ id }) => ({ difficulty: id, twist: true, guideUses: 10, points: 0 }));
+  assert.equal(achievement.test([]), false);
+  assert.equal(achievement.progress([]), "0 / 4 difficulties with Twist");
+  for (const missing of records) {
+    const incomplete = records.filter((r) => r !== missing);
+    const mixed = [...incomplete, ...incomplete, { ...missing, twist: false }, { difficulty: "unknown", twist: true }];
+    assert.equal(achievement.test(mixed, { active: missing }), false);
+    assert.equal(achievement.progress(mixed), "3 / 4 difficulties with Twist");
+  }
+  assert.equal(achievement.test(records), true);
+  assert.equal(achievement.progress([...records, ...records]), "4 / 4 difficulties with Twist");
+});
+
+test("Peek-a-Broke follows actual guide deductions, including nine-use Snappy finishes and Twist", () => {
+  const achievement = ACHIEVEMENTS.find((a) => a.id === "guide-zero");
+  assert.equal(achievement.test([]), false);
+  assert.equal(achievement.test([{ difficulty: "breezy", seconds: 2400, points: 0 }]), false);
+  assert.equal(achievement.test([], { guideUsed: true }), false);
+  assert.equal(achievement.test([], { guideExhausted: true }), true);
+  for (const d of DIFFICULTIES) {
+    for (const twist of [false, true]) {
+      for (const seconds of [0, d.target, d.target * 2]) {
+        for (const guideUses of [0, 1, 8, 9, 10, 11]) {
+          const record = { difficulty: d.id, seconds, guideUses, twist, points: 999 };
+          assert.equal(achievement.test([record]), score(d.id, seconds, guideUses, twist).total === 0);
+        }
+      }
+    }
+  }
+  assert.equal(achievement.test([{ difficulty: "snappy", seconds: 1200, guideUses: 9 }]), true);
+});
+
+test("exhausted guide rewards migrate from old saves and retain validated lifetime evidence", () => {
+  const empty = { version: 1, active: null, records: [] };
+  const record = {
+    id: "zero-point-finish", name: "Just looking", difficulty: "snappy",
+    seconds: 1200, guideUses: 9, date: "2026-10-01T12:00:00Z",
+  };
+  assert.equal(validateData(empty).guideExhausted, false);
+  for (const evidence of [
+    { guideExhausted: true },
+    { active: { ...game(), guideUses: 10 } },
+    { records: [record] },
+    { records: [record], guideExhausted: false },
+  ]) {
+    const restored = validateData({ ...empty, ...evidence });
+    assert.equal(restored.guideExhausted, true);
+    assert.equal(restored.guideUsed, true);
+    restored.active = null;
+    restored.records = [];
+    const roundtrip = validateData(JSON.parse(JSON.stringify(restored)));
+    assert.equal(roundtrip.guideExhausted, true);
+    assert.deepEqual(achievementProgress([], roundtrip).earned.map((a) => a.id), ["guide", "guide-zero"]);
+  }
+  for (const guideExhausted of [null, 0, 1, "true", [], {}]) {
+    assert.throws(() => validateData({ ...empty, guideExhausted }));
+  }
 });
 
 test("guide bonuses and chained point milestones use the same total without duplicate rewards", () => {
