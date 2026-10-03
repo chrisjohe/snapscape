@@ -1,6 +1,6 @@
 # Original Snapscape artwork
 
-Generated with the built-in image-generation tool for this project. The mascot is saved as `mascot.png`; the original sample puzzle, `florida-sunshine.jpg`, has been replaced by the collection below and removed. Delivery copies were resized/compressed for the web. Neither asset uses official team logos.
+Generated with the built-in image-generation tool for this project. The mascot is saved as `mascot.png`. Delivery copies were resized/compressed for the web. Neither asset uses official team logos.
 
 ## Random snapscapes — supplied picture collection
 
@@ -85,10 +85,6 @@ Constraints: one character only; no text, letters, logos, watermark, accessories
 ## Mascot prompt
 
 Use case: illustration-story. Asset type: browser jigsaw game mascot, transparent PNG cutout. A friendly charming alligator mascot, chest-up three-quarter view, wearing a little orange neckerchief. Editorial cut-paper illustration, original expressive design, rich forest green with subtle tactile paper texture. Compact square composition; large simple readable face and toothy smile, clear silhouette readable at 64px; entire chest-up mascot fully visible with comfortable transparent margin. Warm, playful, welcoming. Genuinely transparent background with alpha; no scenery, text, logos, or watermark. One asset only.
-
-## Original sample puzzle prompt (removed asset)
-
-Use case: illustration-story. Asset type: playable sample image for a browser jigsaw puzzle titled A little Florida sunshine (title is metadata only, do not render text). A beautiful inviting sunny Florida freshwater spring, clear turquoise water, cypress trees, palms, a heron, water lilies, and a subtle small friendly alligator on the bank. Rich gouache illustration, varied detailed regions useful for a satisfying jigsaw puzzle. 3:2 landscape composition. Clear foreground, midground and background with distinct varied regions, balanced natural scenery, full-bleed art. Orange sunset light, inviting serene warmth. Luminous turquoise water, warm orange sunlight, deep blue and green details. No text, logos, watermark, border, puzzle pieces, or puzzle outlines. One asset only.
 
 ## Puzzle completion — `gator-celebrate.png`
 
