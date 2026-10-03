@@ -16,8 +16,8 @@
     <link rel="icon" href="./assets/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="icon" href="./assets/favicon-16.png" type="image/png" sizes="16x16" />
     <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png" sizes="180x180" />
-    <link rel="stylesheet" href="./styles.css?v=20261002-20" />
-    <script type="module" src="./app.js?v=20261002-21"></script>
+    <link rel="stylesheet" href="./styles.css?v=20261002-22" />
+    <script type="module" src="./app.js?v=20261002-23"></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to Puzzle Table</a>
@@ -64,8 +64,7 @@
           type="button"
           aria-label="How to play"
           title="How to play"
-          aria-haspopup="dialog"
-          aria-controls="modal"
+          aria-controls="help-tour"
         >
           <span class="help-icon" aria-hidden="true">?</span>
           <span class="help-label">How to play</span>
@@ -476,6 +475,31 @@
     </footer>
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     <div id="announcement" class="sr-only" aria-live="polite"></div>
+    <div id="help-tour" hidden>
+      <div class="tour-shade" aria-hidden="true"></div>
+      <svg class="tour-rings" aria-hidden="true" focusable="false"></svg>
+      <section class="tour-card" role="region" aria-labelledby="tour-title" aria-describedby="tour-progress">
+        <div class="tour-heading">
+          <div>
+            <p id="tour-progress" class="eyebrow"></p>
+            <h2 id="tour-title" tabindex="-1" aria-describedby="tour-progress tour-copy tour-hint"></h2>
+          </div>
+          <button id="tour-close" class="icon-button" type="button" aria-label="Close tour" title="Close tour (Escape)">
+            <span class="toolbar-icon icon-close" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="tour-content">
+          <div id="tour-copy"></div>
+          <p id="tour-hint" class="tour-hint"></p>
+          <div id="tour-actions" class="tour-actions" role="group" aria-label="Explore this step" hidden></div>
+        </div>
+        <div class="tour-navigation">
+          <span class="tour-practice-label">Practice tour</span>
+          <button id="tour-back" class="button secondary" type="button">Back</button>
+          <button id="tour-next" class="button primary" type="button">Next →</button>
+        </div>
+      </section>
+    </div>
     <dialog id="modal" aria-label="Snapscape message">
       <button class="icon-button modal-close" id="modal-close" type="button" aria-label="Close dialog">
         <span class="toolbar-icon icon-close" aria-hidden="true"></span>

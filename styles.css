@@ -2357,8 +2357,150 @@ dialog:has(.win) {
   line-height: 1.6;
   font-size: 15px;
 }
-.help-list li {
-  margin: 10px 0;
+/* The practice surface remains usable through the spotlight; the tour owns
+   focus and activation everywhere else. Reserve room for its fixed card. */
+body.tour-active {
+  padding-bottom: var(--tour-space, 320px);
+}
+.tour-active .start-play {
+  animation: none;
+}
+.tour-shade,
+.tour-rings {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.tour-shade {
+  background: #242b30a6;
+  -webkit-backdrop-filter: grayscale(1);
+  backdrop-filter: grayscale(1);
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
+}
+.tour-rings {
+  fill: none;
+  stroke: #ffd4a5;
+  stroke-width: 2;
+}
+.tour-card {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 61;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 16px;
+  width: min(440px, calc(100% - 32px));
+  max-height: min(500px, 55dvh);
+  padding: 22px;
+  border: 1px solid #e5d1b9;
+  border-radius: 20px;
+  background: var(--paper);
+  box-shadow: 0 16px 70px #101e3a40;
+}
+.tour-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.tour-heading .eyebrow {
+  margin-bottom: 8px;
+  color: var(--orange);
+  font-size: 10px;
+  letter-spacing: 1.5px;
+}
+.tour-heading h2 {
+  font-size: 26px;
+  line-height: 1.12;
+}
+#tour-title:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 4px;
+}
+.tour-content {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  font-size: 14px;
+  padding: 3px;
+  margin: -3px;
+}
+#tour-copy p + p,
+#tour-copy details {
+  margin-top: 10px;
+}
+#tour-copy summary {
+  min-height: 32px;
+  padding: 6px 0;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--green);
+}
+#tour-copy details p {
+  margin: 4px 0 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.tour-hint {
+  margin-top: 14px;
+  padding-left: 12px;
+  border-left: 3px solid #e5ad79;
+  color: var(--muted);
+  font-size: 12px;
+}
+.tour-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.tour-action {
+  border: 1px solid #cdd7c9;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #edf0e6;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 600;
+}
+.tour-action[aria-pressed="true"] {
+  border-color: var(--green);
+  background: #dde6d8;
+}
+.tour-navigation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.tour-navigation .button {
+  padding: 10px 14px;
+  font-size: 13px;
+}
+.tour-navigation button:disabled {
+  cursor: default;
+}
+.tour-practice-label {
+  margin-right: auto;
+  color: var(--muted);
+  font-size: 11px;
+}
+@media (max-width: 600px) {
+  .tour-card {
+    right: 12px;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    width: calc(100% - 24px);
+    max-height: 48dvh;
+    padding: 16px;
+    gap: 12px;
+    border-radius: 16px;
+  }
+  .tour-heading h2 { font-size: 23px; }
 }
 @media (min-width: 1051px) {
   main:has(#play-view:not([hidden]) #setup:not([hidden])) {

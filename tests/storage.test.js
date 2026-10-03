@@ -3,10 +3,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createContext, Script } from "node:vm";
 import * as engine from "../engine.js";
+import { helpSteps } from "../tour.js";
 
 const KEY = "snapscape.v1";
 const source = readFileSync(new URL("../app.js", import.meta.url), "utf8")
-  .replace(/^import \{[\s\S]*?\} from "[^"\n]+";\n/, "");
+  .replace(/^import \{[\s\S]*?\} from "[^"\n]+";\n/gm, "");
 const script = new Script(source, { filename: "app.js" });
 function savedProgress() {
   return {
@@ -29,6 +30,7 @@ function savedProgress() {
 // Measurements are supplied explicitly; no browser rendering or native picker is used.
 function app(storage = new Map([[KEY, JSON.stringify(savedProgress())]])) {
   const nodes = new Map(), blobs = [], revoked = [], intervals = [];
+  let now = 1000;
   let document;
   class Node {
     constructor(id = "") {
@@ -141,9 +143,25 @@ function app(storage = new Map([[KEY, JSON.stringify(savedProgress())]])) {
     removeItem: (key) => storage.delete(key),
   };
   const context = createContext({
-    ...engine, document, window, localStorage, Blob, atob,
+    ...engine, helpSteps, document, window, localStorage, Blob, atob,
+    // Drive the app's real tour callbacks without browser rendering.
+    createHelpTour(config) {
+      let index = 0;
+      config.onStep(config.steps[index]);
+      return {
+        close: config.onClose, refresh() {},
+        get step() { return config.steps[index]; },
+        go(id) {
+          index = config.steps.findIndex((step) => step.id === id);
+          assert.ok(index >= 0, `Unknown tour step: ${id}`);
+          config.onStep(config.steps[index]);
+        },
+        action: config.onAction,
+        escape: config.onEscape,
+      };
+    },
     getComputedStyle: (node) => node.computedStyle,
-    performance: { now: () => 1000 },
+    performance: { now: () => now },
     URL: {
       createObjectURL: (blob) => { blobs.push(blob); return "blob:test"; },
       revokeObjectURL: (url) => revoked.push(url),
@@ -156,9 +174,158 @@ function app(storage = new Map([[KEY, JSON.stringify(savedProgress())]])) {
   script.runInContext(context);
   return {
     node, document, window, storage, localStorage, blobs, revoked, intervals,
+    advance: (milliseconds) => { now += milliseconds; },
     run: (code) => new Script(code).runInContext(context),
   };
 }
+
+test("practice moves, helpers, completion and autosave never modify saved memories or points", async () => {
+  const a = app(), before = a.storage.get(KEY);
+  const dataBefore = a.run("JSON.stringify(data)");
+  await a.node("#help-button").click();
+  assert.equal(a.run("helpTour.step.id"), "setup");
+  assert.equal(a.node("#modal").open, false);
+  a.run('helpTour.go("moving"); positionPiece(0, 0, 0);');
+  await a.run("finishPlacement(0);");
+  a.run('helpTour.go("helpers");');
+  await a.node("#reference-button").click();
+  assert.equal(a.run("showGuide"), true);
+  assert.equal(a.node("#modal").open, false);
+  await a.node("#edges-button").click();
+  assert.equal(a.run("onlyEdges"), true);
+  assert.equal(a.run("game.guideUses"), 0);
+  a.run("game.pieces = game.pieces.map((_, id) => ({ id, group: id, ...target(game, id), locked: true }));");
+  await a.run("completeGame();");
+  for (const interval of a.intervals) interval();
+  await a.window.emit("pagehide");
+  assert.equal(a.storage.get(KEY), before);
+  assert.equal(a.run("JSON.stringify(data)"), dataBefore);
+  a.run("helpTour.close();");
+  assert.equal(a.run("game"), null);
+  assert.equal(a.node("#setup").hidden, false);
+  assert.equal(a.storage.get(KEY), before);
+});
+
+test("exiting every tour step restores the original puzzle, photo, controls, and clock state", async () => {
+  for (const paused of [false, true]) {
+    for (const step of helpSteps(true)) {
+      const a = app();
+      a.run(`resumeSavedGame(); game.twist = true; game.rotations = Array(24).fill(0);
+        showPhoto({ image: "data:image/jpeg;base64,BBBB", ratio: 1, name: "My next puzzle" });
+        selected = 2; showGuide = true; onlyEdges = true; zoomLevel = 1.5; keyboardCell = 3;`);
+      if (paused) a.run("pause();");
+      const gameBefore = a.run("JSON.stringify(game)"), photoBefore = a.run("selectedPhoto");
+      const oldGame = a.run("game"), oldImage = a.run("gameImageUrl");
+      await a.node("#help-button").click();
+      a.run(`helpTour.go("${step.id}"); helpTour.close();`);
+      assert.equal(a.run("game"), oldGame, step.id);
+      assert.equal(a.run("JSON.stringify(game)"), gameBefore, step.id);
+      assert.equal(a.run("selectedPhoto"), photoBefore, step.id);
+      assert.equal(a.run("gameImageUrl"), oldImage, step.id);
+      assert.equal(a.run("paused"), paused, step.id);
+      assert.equal(a.run("selected"), 2, step.id);
+      assert.equal(a.run("showGuide && onlyEdges && keyboardCell === 3 && zoomLevel === 1.5"), true, step.id);
+      assert.equal(a.node("#setup-puzzle-name").textContent, "My next puzzle");
+      assert.equal(a.revoked.includes(oldImage), false);
+      assert.equal(a.node("#pause-cover").hidden, !paused);
+      assert.equal(a.document.activeElement, a.node("#help-button"));
+    }
+  }
+});
+
+test("the tour returns to each original view and does not create a saved game for a new visitor", async () => {
+  for (const view of ["play", "gallery", "achievements"]) {
+    const a = app(new Map());
+    a.run(`switchView("${view}", { showSetup: true });`);
+    await a.node("#help-button").click();
+    a.run('helpTour.go("backup"); helpTour.close();');
+    assert.equal(a.run("view"), view);
+    assert.equal(a.node(`#${view}-view`).hidden, false);
+    assert.equal(a.node("#options-panel").hidden, true);
+    assert.equal(a.run("game"), null);
+    assert.equal(a.run("selectedPhoto"), null);
+    assert.equal(a.storage.has(KEY), false);
+  }
+});
+
+test("time spent in the tour is excluded from the real puzzle and its next autosave", async () => {
+  const a = app();
+  a.run("resumeSavedGame();");
+  a.advance(5000);
+  await a.node("#help-button").click();
+  assert.equal(JSON.parse(a.storage.get(KEY)).active.seconds, 35);
+  a.run('helpTour.go("moving");');
+  a.advance(120000);
+  for (const interval of a.intervals) interval();
+  a.run("helpTour.close();");
+  assert.equal(a.run("seconds()"), 35);
+  a.advance(3000);
+  a.run("save();");
+  assert.equal(JSON.parse(a.storage.get(KEY)).active.seconds, 38);
+});
+
+test("the snap demonstrations join and lock neighbors and can be replayed", async () => {
+  const a = app(), before = a.storage.get(KEY);
+  await a.node("#help-button").click();
+  a.run('helpTour.go("snapping"); helpTour.action("join");');
+  assert.equal(a.run("game.pieces[0].group === game.pieces[1].group"), true);
+  assert.equal(a.run("game.pieces[0].locked || game.pieces[1].locked"), false);
+  a.run('helpTour.action("lock");');
+  assert.equal(a.run("game.pieces[0].locked && game.pieces[1].locked"), true);
+  a.run('helpTour.action("join");');
+  assert.equal(a.run("game.pieces[0].locked"), false);
+  assert.equal(a.storage.get(KEY), before);
+});
+
+test("Twist practice rotates without saving and Escape releases selection before exiting", async () => {
+  const a = app(), before = a.storage.get(KEY);
+  a.node("#random-rotation").setAttribute("aria-pressed", "true");
+  await a.node("#help-button").click();
+  a.run('helpTour.go("rotation");');
+  assert.equal(a.node("#rotation-controls").hidden, false);
+  await a.node("#rotate-right").click();
+  assert.equal(a.run("game.rotations[7]"), 2);
+  assert.equal(a.run("helpTour.escape()"), true);
+  assert.equal(a.run("selected"), null);
+  assert.equal(a.run("helpTour.escape()"), false);
+  assert.equal(a.storage.get(KEY), before);
+});
+
+test("hiding the tab during practice leaves the real game paused and practice usable on return", async () => {
+  const a = app();
+  a.run("resumeSavedGame();");
+  await a.node("#help-button").click();
+  a.run('helpTour.go("moving");');
+  a.document.hidden = true;
+  await a.document.emit("visibilitychange");
+  assert.equal(a.run("paused"), true);
+  a.document.hidden = false;
+  await a.document.emit("visibilitychange");
+  assert.equal(a.run("paused"), false);
+  a.run("helpTour.close();");
+  assert.equal(a.run("paused"), true);
+  assert.equal(a.node("#pause-cover").hidden, false);
+});
+
+test("external replacement and erasure close practice without resurrecting an older save", async () => {
+  for (const erased of [false, true]) {
+    const a = app();
+    a.run("resumeSavedGame();");
+    await a.node("#help-button").click();
+    a.run('helpTour.go("helpers");');
+    const replacement = savedProgress();
+    replacement.active.name = "Changed in another tab";
+    const raw = erased ? null : JSON.stringify(replacement);
+    if (erased) a.storage.delete(KEY);
+    else a.storage.set(KEY, raw);
+    await a.window.emit("storage", { key: KEY, newValue: raw });
+    assert.equal(a.run("helpSession"), null);
+    assert.equal(a.run("helpTour"), null);
+    assert.equal(a.run("game"), null);
+    assert.equal(a.storage.get(KEY) ?? null, raw);
+    assert.equal(a.run("data.active?.name ?? null"), erased ? null : replacement.active.name);
+  }
+});
 
 test("the setup title can be edited without changing a saved game, then starts and resumes with the chosen name", async () => {
   const a = app(), before = a.storage.get(KEY);

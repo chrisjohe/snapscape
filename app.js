@@ -23,6 +23,7 @@ import {
   SAMPLE_SNAPSCAPES,
   validateData,
 } from "./engine.js?v=20261002-21";
+import { helpSteps, createHelpTour } from "./tour.js?v=20261002-23";
 const $ = (s) => document.querySelector(s),
   KEY = "snapscape.v1";
 const PUZZLE_TITLES = [
@@ -87,7 +88,9 @@ let data = emptyData(),
   storageBlocked = false,
   gameImageUrl = null,
   panMode = false,
-  zoomLevel = 1;
+  zoomLevel = 1,
+  helpSession = null,
+  helpTour = null;
 const safe = (s) =>
   String(s).replace(
     /[&<>"']/g,
@@ -122,9 +125,11 @@ function seconds() {
   return elapsed + (!paused ? (performance.now() - runStart) / 1000 : 0);
 }
 function captureTime() {
+  if (helpSession) return;
   if (game) game.seconds = seconds();
 }
 function save() {
+  if (helpSession) return true;
   captureTime();
   if (storageBlocked) return false;
   try {
@@ -173,6 +178,7 @@ function save() {
   }
 }
 function adoptExternal(raw) {
+  helpTour?.close();
   try {
     if (!raw) {
       resetBrowserProgress();
@@ -478,13 +484,15 @@ function openGame() {
   panMode = false;
   $("#pan-button").setAttribute("aria-pressed", "false");
   $("#puzzle-board").classList.remove("pan-mode");
-  if (gameImageUrl) URL.revokeObjectURL(gameImageUrl);
-  const bytes = Uint8Array.from(atob(game.image.split(",")[1]), (c) =>
-    c.charCodeAt(0),
-  );
-  gameImageUrl = URL.createObjectURL(
-    new Blob([bytes], { type: game.image.split(";")[0].slice(5) }),
-  );
+  if (gameImageUrl?.startsWith("blob:") && gameImageUrl !== helpSession?.imageUrl)
+    URL.revokeObjectURL(gameImageUrl);
+  if (helpSession) gameImageUrl = game.image;
+  else {
+    const bytes = Uint8Array.from(atob(game.image.split(",")[1]), (c) => c.charCodeAt(0));
+    gameImageUrl = URL.createObjectURL(
+      new Blob([bytes], { type: game.image.split(";")[0].slice(5) }),
+    );
+  }
   selected = null;
   showGuide = false;
   onlyEdges = false;
@@ -579,6 +587,7 @@ function updatePauseButton() {
   $("#reference-button").disabled = paused;
   updateRotationControl();
   $("#table-scroll").inert = paused;
+  helpTour?.refresh();
 }
 function pause() {
   if (!game || paused) return;
@@ -617,6 +626,15 @@ function leaveGame() {
   updateAll();
 }
 document.addEventListener("visibilitychange", () => {
+  if (helpSession) {
+    if (document.hidden) {
+      helpSession.paused = true;
+      helpSession.demoWasRunning = Boolean(game && !paused);
+    } else if (helpSession.demoWasRunning) {
+      helpSession.demoWasRunning = false;
+      resume();
+    }
+  }
   if (document.hidden) pause();
 });
 window.addEventListener("pagehide", () => {
@@ -659,12 +677,18 @@ siteHeader.addEventListener("keydown", (event) => {
   }
 });
 document.addEventListener("click", (event) => {
+  if (helpSession) return;
   if (!siteHeader.contains(event.target)) setNavigationOpen(false);
 });
 document.addEventListener("focusin", (event) => {
+  if (helpSession) return;
   if (!siteHeader.contains(event.target)) setNavigationOpen(false);
 });
 compactNavigation.addEventListener("change", () => {
+  if (helpSession) {
+    setNavigationOpen(helpTour?.step.id === "navigation");
+    return;
+  }
   const focused = document.activeElement;
   setNavigationOpen(false);
   if (compactNavigation.matches && $("#main-navigation").contains(focused)) {
@@ -720,6 +744,7 @@ function renderGame() {
   renderTray();
   updateGameProgress();
   updateRotationControl();
+  helpTour?.refresh();
 }
 function renderBoard() {
   const { w, h, cw, ch, cols, rows } = geometry(game),
@@ -887,6 +912,11 @@ function setPictureGuide(visible) {
 }
 function usePictureGuide() {
   if (!game || paused || drag || showGuide) return;
+  if (helpSession) {
+    setPictureGuide(true);
+    announce("Practice Picture guide shown. No points deducted.");
+    return;
+  }
   const previewGame = game;
   const previously = achievementProgress(data.records, data).earned;
   game.guideUses = Math.min(Number.MAX_SAFE_INTEGER, (game.guideUses || 0) + 1);
@@ -916,7 +946,7 @@ $("#reference-button").addEventListener("click", () => {
     setPictureGuide(false);
     return;
   }
-  if (game.guideUses > 0) {
+  if (helpSession || game.guideUses > 0) {
     usePictureGuide();
     return;
   }
@@ -970,6 +1000,7 @@ function updateZoomLabel() {
 function setZoomOpen(open) {
   $("#zoom-panel").hidden = !open;
   $("#zoom-button").setAttribute("aria-expanded", String(open));
+  helpTour?.refresh();
 }
 $("#zoom-button").addEventListener("click", () => {
   const open = $("#zoom-panel").hidden;
@@ -984,9 +1015,11 @@ $("#zoom-control").addEventListener("keydown", (event) => {
   }
 });
 document.addEventListener("click", (event) => {
+  if (helpSession) return;
   if (!$("#zoom-control").contains(event.target)) setZoomOpen(false);
 });
 document.addEventListener("focusin", (event) => {
+  if (helpSession) return;
   if (!$("#zoom-control").contains(event.target)) setZoomOpen(false);
 });
 document.querySelectorAll("[data-zoom]").forEach((button) => {
@@ -1237,6 +1270,10 @@ function scoreReels(points) {
   return `<span class="sr-only">+${safe(formatted)}</span><span class="score-reels" aria-hidden="true"><span class="score-plus">+</span>${characters}</span>`;
 }
 async function completeGame() {
+  if (helpSession) {
+    announce("Practice puzzle complete. Nice snapping! Your memories and points are unchanged.");
+    return;
+  }
   captureTime();
   elapsed = game.seconds;
   paused = true;
@@ -1477,12 +1514,157 @@ $("#achievement-content").addEventListener("keydown", (event) => {
     flipAchievement(button, false);
   }
 });
-$("#help-button").addEventListener("click", () => {
+const PRACTICE_PHOTO = {
+  image: "./assets/snapscape-beach.png", ratio: 4 / 3, ownPhoto: false, sampleId: "beach",
+};
+function practicePuzzle(twist) {
+  return {
+    ...PRACTICE_PHOTO, id: "practice-only", name: "A little practice sunshine",
+    difficulty: "breezy", twist, seed: 104, seconds: 42, guideUses: 0,
+    rotations: Array(24).fill(0), pieces: Array(24).fill(null),
+    order: Array.from({ length: 24 }, (_, id) => id), resumed: false,
+  };
+}
+function prepareHelpStep(step) {
+  cancelDrag();
+  setNavigationOpen(false);
+  setOptionsOpen(false);
+  setZoomOpen(false);
+  if (step.id === "setup") {
+    game = null;
+    selected = null;
+    paused = true;
+    $("#setup").hidden = false;
+    $("#game").hidden = true;
+    return;
+  }
+  game = practicePuzzle(helpSession.twist);
+  openGame();
+  if (step.id === "snapping") {
+    const { cw, ch } = geometry(game);
+    game.pieces[0] = { id: 0, group: 0, x: cw, y: ch * 1.5, locked: false };
+    game.pieces[1] = { id: 1, group: 1, x: cw * 2.5, y: ch * 1.5, locked: false };
+    renderGame();
+  } else if (step.id === "rotation") {
+    const { cw, ch } = geometry(game);
+    game.pieces[7] = { id: 7, group: 7, x: cw * 2, y: ch * 1.5, locked: false };
+    game.rotations[7] = 1;
+    selected = 7;
+    renderGame();
+  } else if (step.id === "view") {
+    setPictureGuide(true);
+    setZoomOpen(true);
+  } else if (step.id === "navigation") {
+    setNavigationOpen(true);
+  } else if (step.id === "backup") {
+    setOptionsOpen(true);
+  }
+}
+function demonstrateSnap(action) {
+  // Reset the two neighbors so either demonstration can be replayed in any order.
+  const { cw, ch } = geometry(game);
+  cancelDrag();
+  game.pieces[0] = { id: 0, group: 0, x: cw, y: ch * 1.5, locked: false };
+  game.pieces[1] = { id: 1, group: 1, x: cw * 2, y: ch * 1.5, locked: false };
+  game.rotations[0] = game.rotations[1] = 0;
+  placeGroup(game, 1);
+  if (action === "lock") {
+    positionPiece(0, 0, 0);
+    placeGroup(game, 0);
+  }
+  selected = null;
+  renderGame();
+  announce(action === "lock" ? "Both pieces are upright and home. They are locked in the frame." : "Matching neighbors snapped together. You can move them as a group.");
+}
+function finishHelpTour() {
+  const previous = helpSession;
+  if (!previous) return;
+  cancelDrag();
+  helpTour = null;
+  helpSession = null;
+  game = previous.game;
+  gameImageUrl = previous.imageUrl;
+  paused = previous.paused || document.hidden;
+  elapsed = previous.elapsed;
+  runStart = performance.now();
+  selected = previous.selected;
+  showGuide = previous.showGuide;
+  onlyEdges = previous.onlyEdges;
+  keyboardCell = previous.keyboardCell;
+  panMode = previous.panMode;
+  zoomLevel = previous.zoomLevel;
+  view = previous.view;
+  if (previous.photo) {
+    showPhoto(previous.photo);
+    selectedPhoto = previous.photo;
+    renderSetupTitle();
+  } else resetPhoto();
+  $("#game").hidden = !game;
+  $("#setup").hidden = Boolean(game);
+  setNavigationOpen(false);
+  setOptionsOpen(false);
+  setZoomOpen(false);
+  $("#pan-button").setAttribute("aria-pressed", String(panMode));
+  $("#puzzle-board").classList.toggle("pan-mode", panMode);
+  $("#edges-button").setAttribute("aria-pressed", String(onlyEdges));
+  $("#reference-button").setAttribute("aria-pressed", String(showGuide));
+  updateZoomLabel();
+  switchView(view, { showSetup: !game });
+  if (game) {
+    $("#game-name").textContent = game.name;
+    $("#pause-cover").hidden = !paused;
+    updatePauseButton();
+    renderGame();
+    tick();
+    $("#table-scroll").scrollTo(previous.tableX, previous.tableY);
+  }
+  window.scrollTo({ left: previous.scrollX, top: previous.scrollY, behavior: "instant" });
+  $("#help-button").focus({ preventScroll: true });
+  announce("Tour finished. You’re back where you started.");
+}
+function startHelpTour() {
+  if (helpSession) return;
+  if (photoLoading) {
+    toast("Your photo is still getting ready. Try How to play in a moment.");
+    return;
+  }
+  const wasPaused = paused;
+  cancelDrag();
   if (game) pause();
-  modal(
-    '<p class="eyebrow">MAKE YOURSELF AT HOME</p><h2>A few friendly pointers.</h2><ol class="help-list"><li>Choose a photo and a difficulty. Your photo keeps its original shape. Use the pencil beside the suggested name in step 3 to make it yours, or change it later beside the title during play.</li><li>Drag pieces from the tray onto the table. You can also tap a piece, then tap a spot on the table.</li><li>Matching neighbors snap into groups you can move together. Pieces lock when they reach their home in the frame, facing upright.</li><li>Turn on Give it a twist before starting for randomly rotated pieces and double puzzle points. Select a piece, then use Rotate left or Rotate right above the selected piece to turn it 90°. You can also press R to turn right or Shift+R to turn left. Connected groups rotate together. Twist doubles base points, the rounded time bonus, and Picture guide costs; achievement rewards stay the same.</li><li>Picture guide previews the photo until you move a piece. Each use costs 10% of the difficulty’s base points, rounded to the nearest whole point: 1, 3, 6, or 14 Snap Points. The first use asks you to confirm; after 10 uses, the puzzle earns no points, including any time bonus. Edge pieces filters the border pieces for free. Zoom offers 50%, 75%, Fit, 125%, 150%, and 200%. Fit shows the whole picture. Pan table lets you swipe around a zoomed table; turn it off to move pieces.</li><li>For keyboard play, select a piece with Enter, use arrow keys on the table, and press Enter to place. Escape puts the selection down.</li><li>The clock counts active play only. Pause anytime; hiding this tab pauses automatically.</li></ol><p>Each puzzle starts with base points and a time bonus of up to 50%, rounded to the nearest whole point. The bonus gradually reaches zero by 8, 20, 40, or 80 minutes, depending on difficulty. All Snap Points are whole numbers. Picture guide deductions cannot reduce this puzzle’s reward below zero; previously earned points stay yours.</p><p>Each Chomp Club achievement adds a one-time reward of 5–200 Snap Points, shown on its card. Already earned achievements count, too. Achievement rewards count toward point milestones and remain available even when a puzzle earns no points. Your total includes puzzle and achievement rewards.</p><p><strong>Your puzzle saves automatically in this browser</strong> after every move and regularly while you play. You can close the tab and return later. Select the snapscape logo to return to photo setup, or visit the Trophy Swamp and Chomp Club. Select <strong>Continue puzzle</strong> to pick up where you left off.</p><p>Use <strong>Options → Back up memories</strong> to keep a copy or move to another device.</p><p><strong>Choosing a photo:</strong> JPG, PNG, or WebP, up to 20 MB. HEIC/HEIF photos work only if your browser can open them; otherwise use a JPG copy.</p>',
-  );
-});
+  helpSession = {
+    game, imageUrl: gameImageUrl, paused: wasPaused, elapsed, selected,
+    showGuide, onlyEdges, keyboardCell, panMode, zoomLevel, view,
+    photo: selectedPhoto, scrollX: window.scrollX, scrollY: window.scrollY,
+    tableX: $("#table-scroll").scrollLeft, tableY: $("#table-scroll").scrollTop,
+    twist: (game || (view !== "play" ? data.active : null))?.twist ??
+      ($("#random-rotation").getAttribute("aria-pressed") === "true"),
+  };
+  ++importToken;
+  game = null;
+  showPhoto(PRACTICE_PHOTO);
+  switchView("play", { showSetup: true });
+  try {
+    helpTour = createHelpTour({
+      steps: helpSteps(helpSession.twist),
+      onStep: prepareHelpStep,
+      onAction: demonstrateSnap,
+      onClose: finishHelpTour,
+      onLayout: sizeBoard,
+      onEscape: () => {
+        if (selected === null && !drag) return false;
+        cancelDrag();
+        selected = null;
+        if (game) renderGame();
+        announce("Practice selection put down. Press Escape again to close the tour.");
+        return true;
+      },
+    });
+  } catch (error) {
+    finishHelpTour();
+    throw error;
+  }
+}
+$("#help-button").addEventListener("click", startHelpTour);
 const optionsToggle = $("#options-toggle"),
   optionsPanel = $("#options-panel"),
   footerOptions = $("#footer-options");
@@ -1501,9 +1683,11 @@ footerOptions.addEventListener("keydown", (event) => {
   }
 });
 document.addEventListener("click", (event) => {
+  if (helpSession) return;
   if (!footerOptions.contains(event.target)) setOptionsOpen(false);
 });
 document.addEventListener("focusin", (event) => {
+  if (helpSession) return;
   if (!footerOptions.contains(event.target)) setOptionsOpen(false);
 });
 const aboutDialog = $("#about-dialog");
@@ -1598,6 +1782,7 @@ $("#import-input").addEventListener("change", async (e) => {
   }
 });
 function resetBrowserProgress() {
+  helpTour?.close();
   data = emptyData();
   game = null;
   paused = true;
@@ -1704,7 +1889,8 @@ function sizeBoard() {
       12
     : 12;
   const { tableWidth, tableHeight, width, height, scale } = boardViewport({
-    viewportHeight: window.visualViewport?.height || window.innerHeight,
+    viewportHeight: (window.visualViewport?.height || window.innerHeight) -
+      (helpSession ? $(".tour-card").getBoundingClientRect().height + 28 : 0),
     tableTop: table.getBoundingClientRect().top + window.scrollY,
     spaceBelow,
     availableWidth: Math.max(1, availableWidth),
