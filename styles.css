@@ -444,6 +444,7 @@ main {
   display: block;
   width: 100%;
   height: auto;
+  overflow: visible;
   pointer-events: none;
 }
 .photo-remove {
@@ -486,6 +487,7 @@ main {
   min-height: 112px;
   margin: 14px 0 16px;
   padding: 8px 10px;
+  border-radius: 14px;
   flex-direction: column;
   gap: 6px;
 }
@@ -732,6 +734,23 @@ input[type="text"] {
   height: 18px;
   object-fit: contain;
 }
+.rotation-addon-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 20px 0 10px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.rotation-addon-label::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
 .rotation-option {
   position: relative;
   display: grid;
@@ -739,7 +758,7 @@ input[type="text"] {
   align-items: center;
   gap: 10px;
   width: 100%;
-  margin-top: 12px;
+  margin-top: 0;
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -1228,6 +1247,13 @@ main:has(#game:not([hidden])) {
   position: relative;
   min-width: 0;
 }
+.rotation-tools {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+  transform: translate(-50%, -100%);
+}
 .table-tools {
   grid-area: tools;
   position: relative;
@@ -1289,6 +1315,12 @@ main:has(#game:not([hidden])) {
 }
 .icon-pan {
   --toolbar-icon: url("./assets/drag_pan_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg");
+}
+.icon-rotate-left {
+  --toolbar-icon: url("./assets/rotate_left_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg");
+}
+.icon-rotate-right {
+  --toolbar-icon: url("./assets/rotate_right_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg");
 }
 .icon-size {
   --toolbar-icon: url("./assets/frame_inspect_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg");
@@ -1364,13 +1396,6 @@ main:has(#game:not([hidden])) {
   justify-content: flex-end;
   flex: 0 0 auto;
   padding: 4px 8px 0;
-}
-.rotate-button {
-  margin-right: auto;
-}
-.rotate-icon {
-  font-size: 24px;
-  line-height: 1;
 }
 .filter-button {
   position: relative;
@@ -2239,6 +2264,12 @@ dialog:has(.win) {
 }
 .help-list li {
   margin: 10px 0;
+}
+@media (min-width: 1051px) {
+  main:has(#play-view:not([hidden]) #setup:not([hidden])) {
+    padding-top: 20px;
+    padding-bottom: 42px;
+  }
 }
 @media (min-width: 1400px) {
   main {

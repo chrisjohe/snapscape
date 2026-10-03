@@ -273,13 +273,13 @@ function renderPhotoPreview(photo) {
   const width = 900,
     height = width / photo.ratio,
     pieceSize = Math.min(width, height) * 0.26,
-    viewWidth = width + pieceSize * 0.54,
     viewHeight = height + pieceSize * 0.64,
     preview = $("#preview-image");
   // Reuse a square bottom-left corner from the game's puzzle-piece geometry.
   const corner = piecePath({ difficulty: "breezy", ratio: 4 / 3, seed: 0 }, 8);
-  preview.setAttribute("viewBox", `${-pieceSize * 0.5} ${-pieceSize * 0.04} ${viewWidth} ${viewHeight}`);
-  $("#photo-preview").style.setProperty("--preview-width", `${280 * viewWidth / viewHeight}px`);
+  // Center the photo itself; the loose piece overflows to the left without shifting it.
+  preview.setAttribute("viewBox", `0 ${-pieceSize * 0.04} ${width} ${viewHeight}`);
+  $("#photo-preview").style.setProperty("--preview-width", `${280 * width / viewHeight}px`);
   // Both parts reference the same image, keeping the cutout and loose piece aligned.
   preview.innerHTML = `<defs>
     <image id="preview-photo-source" href="${safe(photo.image)}" width="${width}" height="${height}"/>
@@ -462,7 +462,6 @@ function startGame() {
   save();
 }
 function openGame() {
-  $("#rotate-piece").hidden = !game.twist;
   panMode = false;
   $("#pan-button").setAttribute("aria-pressed", "false");
   $("#puzzle-board").classList.remove("pan-mode");
@@ -764,8 +763,29 @@ function updateTrayReturnState() {
   $("#piece-tray").inert = paused || carrying;
 }
 function updateRotationControl() {
-  $("#rotate-piece").disabled = !game?.twist || paused || selected === null || Boolean(drag) || Boolean(game.pieces[selected]?.locked);
+  const visible = Boolean(game?.twist && !paused && selected !== null && !game.pieces[selected]?.locked),
+    buttons = [$("#rotate-left"), $("#rotate-right")];
+  $("#rotation-controls").hidden = !visible;
+  for (const button of buttons) button.disabled = !visible || Boolean(drag) || panMode;
+  if (visible) positionRotationControls();
+  if (!visible && !paused && buttons.includes(document.activeElement))
+    $("#puzzle-board").focus({ preventScroll: true });
 }
+function positionRotationControls() {
+  const controls = $("#rotation-controls");
+  if (controls.hidden || !game || selected === null) return;
+  // Measure the outline, since the clipped image extends beyond the piece.
+  // Its screen bounds include rotation, zoom, and the table's scroll offset.
+  const outline = game.pieces[selected]
+    ? $(`#puzzle-board [data-piece="${selected}"] .piece-outline`)
+    : $(".tray-return-preview .piece-outline");
+  if (!outline) return;
+  const piece = outline.getBoundingClientRect(),
+    area = $(".table-area").getBoundingClientRect();
+  controls.style.left = `${piece.left + piece.width / 2 - area.left}px`;
+  controls.style.top = `${piece.top - area.top - 12}px`;
+}
+$("#table-scroll").addEventListener("scroll", positionRotationControls, { passive: true });
 async function rotateSelectedPiece(turns = 1) {
   if (!game?.twist || paused || selected === null || drag || panMode) return;
   const id = selected, count = rotateGroup(game, id, turns);
@@ -779,14 +799,16 @@ async function rotateSelectedPiece(turns = 1) {
   if (game.pieces.every((p) => p?.locked)) await completeGame();
   else save();
 }
-$("#rotate-piece").addEventListener("click", () => rotateSelectedPiece());
+$("#rotate-left").addEventListener("click", () => rotateSelectedPiece(-1));
+$("#rotate-right").addEventListener("click", () => rotateSelectedPiece(1));
 function rotationKey(event) {
   if (event.key.toLowerCase() !== "r" || event.ctrlKey || event.metaKey || event.altKey || !game?.twist || selected === null || paused) return false;
   event.preventDefault();
   if (!event.repeat) rotateSelectedPiece(event.shiftKey ? -1 : 1);
   return true;
 }
-$("#rotate-piece").addEventListener("keydown", rotationKey);
+$("#rotate-left").addEventListener("keydown", rotationKey);
+$("#rotate-right").addEventListener("keydown", rotationKey);
 function putPieceBack(id) {
   if (!game || paused || id === null || game.pieces[id]?.locked) return;
   const count = returnGroupToTray(game, id);
@@ -823,7 +845,7 @@ function selectPiece(id) {
   renderGame();
   if (selected !== null) {
     announce(
-      `Piece ${id + 1} selected. Tap the table to place it, or use arrow keys, then Enter.${game.twist ? " Use Rotate or R to turn it; Shift+R turns it back." : ""}`,
+      `Piece ${id + 1} selected. Tap the table to place it, or use arrow keys, then Enter.${game.twist ? " Use Rotate left or Rotate right to turn it; R turns right and Shift+R turns left." : ""}`,
     );
     $("#puzzle-board").focus({ preventScroll: true });
   }
@@ -1076,6 +1098,7 @@ function pointerMove(e) {
         if (node) node.setAttribute("transform", `translate(${p.x},${p.y})`);
       }
     }
+  positionRotationControls();
   $(".tray-panel").classList.toggle(
     "is-drag-over",
     withinTray(e.clientX, e.clientY),
@@ -1433,7 +1456,7 @@ $("#achievement-content").addEventListener("keydown", (event) => {
 $("#help-button").addEventListener("click", () => {
   if (game) pause();
   modal(
-    '<p class="eyebrow">MAKE YOURSELF AT HOME</p><h2>A few friendly pointers.</h2><ol class="help-list"><li>Choose a photo and a difficulty. Your photo keeps its original shape. Use the pencil beside the suggested name in step 3 to make it yours, or change it later beside the title during play.</li><li>Drag pieces from the tray onto the table. You can also tap a piece, then tap a spot on the table.</li><li>Matching neighbors snap into groups you can move together. Pieces lock when they reach their home in the frame, facing upright.</li><li>Turn on Give it a twist before starting for randomly rotated pieces and double puzzle points. Select a piece, then use Rotate or press R to turn it 90° clockwise; Shift+R turns it back. Connected groups rotate together. Twist doubles base points, the rounded time bonus, and Picture guide costs; achievement rewards stay the same.</li><li>Picture guide previews the photo until you move a piece. Each use costs 10% of the difficulty’s base points, rounded to the nearest whole point: 1, 3, 6, or 14 Snap Points. The first use asks you to confirm; after 10 uses, the puzzle earns no points, including any time bonus. Edge pieces filters the border pieces for free. Zoom offers 50%, 75%, Fit, 125%, 150%, and 200%. Fit shows the whole picture. Pan table lets you swipe around a zoomed table; turn it off to move pieces.</li><li>For keyboard play, select a piece with Enter, use arrow keys on the table, and press Enter to place. Escape puts the selection down.</li><li>The clock counts active play only. Pause anytime; hiding this tab pauses automatically.</li></ol><p>Each puzzle starts with base points and a time bonus of up to 50%, rounded to the nearest whole point. The bonus gradually reaches zero at 4, 10, 20, or 40 minutes, depending on difficulty. All Snap Points are whole numbers. Picture guide deductions cannot reduce this puzzle’s reward below zero; previously earned points stay yours.</p><p>Each Chomp Club achievement adds a one-time reward of 5–200 Snap Points, shown on its card. Already earned achievements count, too. Achievement rewards count toward point milestones and remain available even when a puzzle earns no points. Your total includes puzzle and achievement rewards.</p><p><strong>Your puzzle saves automatically in this browser</strong> after every move and regularly while you play. You can close the tab and return later. Select the snapscape logo to return to photo setup, or visit the Trophy Swamp and Chomp Club. Select <strong>Continue puzzle</strong> to pick up where you left off.</p><p>Use <strong>Options → Back up memories</strong> to keep a copy or move to another device.</p><p><strong>Choosing a photo:</strong> JPG, PNG, or WebP, up to 20 MB. HEIC/HEIF photos work only if your browser can open them; otherwise use a JPG copy.</p>',
+    '<p class="eyebrow">MAKE YOURSELF AT HOME</p><h2>A few friendly pointers.</h2><ol class="help-list"><li>Choose a photo and a difficulty. Your photo keeps its original shape. Use the pencil beside the suggested name in step 3 to make it yours, or change it later beside the title during play.</li><li>Drag pieces from the tray onto the table. You can also tap a piece, then tap a spot on the table.</li><li>Matching neighbors snap into groups you can move together. Pieces lock when they reach their home in the frame, facing upright.</li><li>Turn on Give it a twist before starting for randomly rotated pieces and double puzzle points. Select a piece, then use Rotate left or Rotate right above the selected piece to turn it 90°. You can also press R to turn right or Shift+R to turn left. Connected groups rotate together. Twist doubles base points, the rounded time bonus, and Picture guide costs; achievement rewards stay the same.</li><li>Picture guide previews the photo until you move a piece. Each use costs 10% of the difficulty’s base points, rounded to the nearest whole point: 1, 3, 6, or 14 Snap Points. The first use asks you to confirm; after 10 uses, the puzzle earns no points, including any time bonus. Edge pieces filters the border pieces for free. Zoom offers 50%, 75%, Fit, 125%, 150%, and 200%. Fit shows the whole picture. Pan table lets you swipe around a zoomed table; turn it off to move pieces.</li><li>For keyboard play, select a piece with Enter, use arrow keys on the table, and press Enter to place. Escape puts the selection down.</li><li>The clock counts active play only. Pause anytime; hiding this tab pauses automatically.</li></ol><p>Each puzzle starts with base points and a time bonus of up to 50%, rounded to the nearest whole point. The bonus gradually reaches zero at 4, 10, 20, or 40 minutes, depending on difficulty. All Snap Points are whole numbers. Picture guide deductions cannot reduce this puzzle’s reward below zero; previously earned points stay yours.</p><p>Each Chomp Club achievement adds a one-time reward of 5–200 Snap Points, shown on its card. Already earned achievements count, too. Achievement rewards count toward point milestones and remain available even when a puzzle earns no points. Your total includes puzzle and achievement rewards.</p><p><strong>Your puzzle saves automatically in this browser</strong> after every move and regularly while you play. You can close the tab and return later. Select the snapscape logo to return to photo setup, or visit the Trophy Swamp and Chomp Club. Select <strong>Continue puzzle</strong> to pick up where you left off.</p><p>Use <strong>Options → Back up memories</strong> to keep a copy or move to another device.</p><p><strong>Choosing a photo:</strong> JPG, PNG, or WebP, up to 20 MB. HEIC/HEIF photos work only if your browser can open them; otherwise use a JPG copy.</p>',
   );
 });
 const optionsToggle = $("#options-toggle"),
@@ -1678,6 +1701,7 @@ function sizeBoard() {
   }
   $("#puzzle-board").style.width = `${width * scale}px`;
   $("#puzzle-board").style.height = `${height * scale}px`;
+  positionRotationControls();
 }
 const boardResizeObserver = new ResizeObserver(sizeBoard);
 boardResizeObserver.observe($(".game-layout"));

@@ -176,18 +176,21 @@
                 <legend class="sr-only">Puzzle difficulty</legend>
                 <div id="difficulty-options" class="difficulty-options"></div>
               </fieldset>
+              <p id="rotation-addon-label" class="rotation-addon-label">
+                Optional extra challenge
+              </p>
               <button
                 id="random-rotation"
                 class="rotation-option"
                 type="button"
                 aria-pressed="false"
                 aria-labelledby="rotation-title rotation-points"
-                aria-describedby="rotation-description"
+                aria-describedby="rotation-addon-label rotation-description"
               >
                 <img class="rotation-gator" src="./assets/gator-twist.png" alt="" width="64" height="64" aria-hidden="true" />
                 <span class="rotation-copy">
                   <strong id="rotation-title">Give it a twist!</strong>
-                  <span id="rotation-description">Randomly rotated pieces</span>
+                  <span id="rotation-description">Rotated pieces at any level</span>
                 </span>
                 <span class="rotation-controls">
                   <span id="rotation-points" class="rotation-points">
@@ -255,6 +258,28 @@
         <section id="game" hidden aria-label="Jigsaw puzzle">
           <div class="game-layout">
             <div class="table-area">
+              <div id="rotation-controls" class="rotation-tools" role="group" aria-label="Rotate selected piece" hidden>
+                <button
+                  id="rotate-left"
+                  class="button secondary icon-button"
+                  type="button"
+                  aria-label="Rotate left (Shift+R)"
+                  title="Rotate left (Shift+R)"
+                  disabled
+                >
+                  <span class="toolbar-icon icon-rotate-left" aria-hidden="true"></span>
+                </button>
+                <button
+                  id="rotate-right"
+                  class="button secondary icon-button"
+                  type="button"
+                  aria-label="Rotate right (R)"
+                  title="Rotate right (R)"
+                  disabled
+                >
+                  <span class="toolbar-icon icon-rotate-right" aria-hidden="true"></span>
+                </button>
+              </div>
               <div class="table-scroll" id="table-scroll">
                 <svg
                   id="puzzle-board"
@@ -381,10 +406,6 @@
               </div>
               <aside class="tray-panel" aria-label="Loose puzzle pieces">
                 <div class="tray-controls">
-                  <button id="rotate-piece" class="filter-button rotate-button" type="button" aria-label="Rotate selected piece clockwise (R)" title="Select a piece, then rotate it (R)" disabled hidden>
-                    <span class="rotate-icon" aria-hidden="true">↻</span>
-                    Rotate
-                  </button>
                   <button
                     id="edges-button"
                     class="filter-button"
