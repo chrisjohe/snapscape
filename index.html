@@ -33,30 +33,42 @@
         />
         <span class="brand-name">snapscape</span></a
       >
-      <button
-        id="nav-toggle"
-        class="nav-toggle"
-        aria-label="Open navigation"
-        aria-expanded="false"
-        aria-controls="main-navigation"
-      >
-        <span class="nav-toggle-icon" aria-hidden="true"></span>
-        <span class="toolbar-icon icon-close" aria-hidden="true"></span>
-      </button>
-      <nav
-        id="main-navigation"
-        class="main-navigation"
-        aria-label="Main navigation"
-      >
-        <button class="nav-button active" data-view="play" aria-current="page">
-          <span id="play-nav-label">Puzzle Table</span>
-          <span id="play-nav-icon" class="toolbar-icon icon-play" aria-hidden="true" hidden></span></button
-        ><button class="nav-button" data-view="gallery">
-          Trophy Swamp <span id="gallery-count" class="count">0</span></button
-        ><button class="nav-button" data-view="achievements">
-          Chomp Club <span id="achievement-count" class="count">0</span><span class="sr-only"> earned</span>
+      <div class="header-navigation">
+        <button
+          id="header-continue"
+          class="header-continue"
+          type="button"
+          aria-label="Continue puzzle"
+          title="Continue puzzle"
+          hidden
+        >
+          <span class="toolbar-icon icon-play" aria-hidden="true"></span>
         </button>
-      </nav>
+        <button
+          id="nav-toggle"
+          class="nav-toggle"
+          aria-label="Open navigation"
+          aria-expanded="false"
+          aria-controls="main-navigation"
+        >
+          <span class="toolbar-icon icon-menu" aria-hidden="true"></span>
+          <span class="toolbar-icon icon-close" aria-hidden="true"></span>
+        </button>
+        <nav
+          id="main-navigation"
+          class="main-navigation"
+          aria-label="Main navigation"
+        >
+          <button class="nav-button active" data-view="play" aria-current="page">
+            <span id="play-nav-label">Puzzle Table</span>
+            <span id="play-nav-icon" class="toolbar-icon icon-play" aria-hidden="true" hidden></span></button
+          ><button class="nav-button" data-view="gallery">
+            Trophy Swamp <span id="gallery-count" class="count">0</span></button
+          ><button class="nav-button" data-view="achievements">
+            Chomp Club <span id="achievement-count" class="count">0</span><span class="sr-only"> earned</span>
+          </button>
+        </nav>
+      </div>
       <div class="header-actions">
         <button
           id="help-button"

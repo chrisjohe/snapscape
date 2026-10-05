@@ -703,6 +703,7 @@ function tick() {
   $("#timer").dataset.long = String(time.length > 5);
 }
 const navToggle = $("#nav-toggle"),
+  headerContinue = $("#header-continue"),
   siteHeader = $(".site-header"),
   compactNavigation = window.matchMedia("(max-width: 960px)");
 function setNavigationOpen(open) {
@@ -742,6 +743,8 @@ compactNavigation.addEventListener("change", () => {
   setNavigationOpen(false);
   if (compactNavigation.matches && $("#main-navigation").contains(focused)) {
     navToggle.focus();
+  } else if (!compactNavigation.matches && focused === headerContinue) {
+    $('[data-view="play"]').focus();
   } else if (!compactNavigation.matches && focused === navToggle) {
     $(".nav-button.active").focus();
   }
@@ -776,6 +779,7 @@ document
   .forEach((b) =>
     b.addEventListener("click", () => switchView(b.dataset.view)),
   );
+headerContinue.addEventListener("click", () => switchView("play"));
 $(".brand").addEventListener("click", (e) => {
   e.preventDefault();
   switchView("play", { showSetup: true });
@@ -1500,6 +1504,7 @@ function updatePlayNavigation() {
   $('[data-view="play"]').classList.toggle("can-resume", canResume);
   $("#play-nav-label").textContent = canResume ? "Continue puzzle" : "Puzzle Table";
   $("#play-nav-icon").hidden = !canResume;
+  headerContinue.hidden = !canResume;
 }
 function updateAll() {
   const progress = achievementProgress(data.records, data);
