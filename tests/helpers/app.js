@@ -94,6 +94,7 @@ export function app(storage = new Map([[KEY, JSON.stringify(savedProgress())]]))
       return this.emit("close");
     }
     scrollTo() {}
+    getScreenCTM() { return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }; }
     hasPointerCapture() { return false; }
     append() {}
     remove() {}

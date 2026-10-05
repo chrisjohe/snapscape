@@ -1498,6 +1498,21 @@ main:has(#game:not([hidden])) {
   stroke: var(--bright);
   stroke-width: 4;
 }
+.board-piece.is-dragging {
+  visibility: hidden;
+}
+#puzzle-board.is-dragging {
+  cursor: grabbing;
+}
+#drag-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+}
 .tray-controls {
   display: flex;
   justify-content: flex-end;
@@ -1621,8 +1636,7 @@ main:has(#game:not([hidden])) {
   width: 100%;
   height: 100%;
 }
-.tray-return:focus-visible,
-.tray-panel.is-drag-over .tray-return {
+.tray-return:focus-visible {
   border-color: var(--ink);
   background: #d9ddd4b3;
 }
@@ -1634,6 +1648,12 @@ main:has(#game:not([hidden])) {
 }
 .tray-return:focus-visible {
   outline-offset: -5px;
+}
+.tray-panel.is-drag-over .tray-return {
+  border-color: var(--orange);
+  background: #ffeadcf2;
+  box-shadow: inset 0 0 0 3px #eb683540;
+  color: var(--orange);
 }
 .tray-piece {
   background: #f2f3ec;

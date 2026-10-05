@@ -233,8 +233,8 @@ function adoptExternal(raw) {
     unreadableSave = null;
     $("#storage-warning").hidden = true;
     if (interrupted) {
+      cancelDrag();
       game = null;
-      drag = null;
       paused = true;
       selected = null;
       $("#game").hidden = true;
@@ -694,6 +694,7 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden) pause();
 });
 window.addEventListener("pagehide", () => {
+  cancelDrag();
   captureTime();
   save();
 });
@@ -838,7 +839,10 @@ function renderGame() {
 }
 function updateBoardSelection() {
   for (const piece of game.pieces) {
-    if (piece) $(`#puzzle-board [data-piece="${piece.id}"]`)?.classList.toggle("selected", selected === piece.id);
+    if (!piece) continue;
+    const node = $(`#puzzle-board [data-piece="${piece.id}"]`);
+    node?.classList.toggle("selected", selected === piece.id);
+    node?.classList.toggle("is-dragging", isDraggedPiece(piece.id));
   }
   const cursor = $("#keyboard-cursor"), { cw, ch } = geometry(game), t = target(game, keyboardCell);
   cursor.setAttribute("visibility", selected === null ? "hidden" : "visible");
@@ -885,7 +889,7 @@ function trayPieceSvg(id, prefix) {
 }
 function renderTray() {
   const ids = game.order.filter(
-    (id) => !game.pieces[id] && (!onlyEdges || edges(game, id).includes(0)),
+    (id) => !game.pieces[id] && !isDraggedPiece(id) && (!onlyEdges || edges(game, id).includes(0)),
   );
   const signature = ids.map((id) => `${id}:${pieceRotation(game, id)}`).join(",") + `:${onlyEdges}`;
   if (trayRender?.game === game && trayRender.image === gameImageUrl && trayRender.signature === signature) {
@@ -909,16 +913,20 @@ function renderTray() {
   updateTrayReturnState();
 }
 function updateTrayReturnState() {
-  const carrying = selected !== null && !paused;
+  const carrying = selected !== null && !paused,
+    overTray = Boolean(carrying && drag?.moving && drag.overTray),
+    preview = carrying && game?.twist && !drag?.moving,
+    label = overTray ? "release to put back"
+      : drag?.moving && drag.members.length > 1 ? "put pieces back" : "put piece back";
   $(".tray-panel").classList.toggle("is-return-target", carrying);
-  if (!drag?.moving) $(".tray-panel").classList.remove("is-drag-over");
+  $(".tray-panel").classList.toggle("is-drag-over", overTray);
   $("#clear-selection").hidden = !carrying;
-  $("#clear-selection").classList.toggle("with-preview", Boolean(carrying && game?.twist));
-  $("#clear-selection").innerHTML = `${carrying && game?.twist ? `<span class="tray-return-preview">${trayPieceSvg(selected, "held")}</span>` : ""}<span>put piece back</span>`;
+  $("#clear-selection").classList.toggle("with-preview", Boolean(preview));
+  $("#clear-selection").innerHTML = `${preview ? `<span class="tray-return-preview">${trayPieceSvg(selected, "held")}</span>` : ""}<span>${label}</span>`;
   $("#piece-tray").inert = paused || carrying;
 }
 function updateRotationControl() {
-  const visible = Boolean(game?.twist && !paused && selected !== null && !game.pieces[selected]?.locked),
+  const visible = Boolean(game?.twist && !paused && !drag?.moving && selected !== null && !game.pieces[selected]?.locked),
     buttons = [$("#rotate-left"), $("#rotate-right")];
   $("#rotation-controls").hidden = !visible;
   for (const button of buttons) button.disabled = !visible || Boolean(drag) || panMode;
@@ -1237,6 +1245,34 @@ async function finishPlacement(id) {
   if (after === game.pieces.length) await completeGame();
   else save();
 }
+function isDraggedPiece(id) {
+  return Boolean(drag?.moving && drag.members.some((p) => p.id === id));
+}
+function renderDragPreview() {
+  const anchor = drag.members.find((p) => p.id === drag.id);
+  // Use separate clip IDs and group-relative positions. The fixed SVG lives
+  // outside the scrollable table, so neither its edge nor the tray clips it.
+  $("#drag-preview-pieces").innerHTML = drag.members.map((p) =>
+    `<g class="board-piece ${p.id === drag.id ? "selected" : ""}" transform="translate(${p.x - anchor.x},${p.y - anchor.y})">${pieceMarkup(p.id, "drag")}</g>`,
+  ).join("");
+  $("#drag-preview").hidden = false;
+  $("#puzzle-board").classList.add("is-dragging");
+}
+function moveDragPreview(x, y) {
+  const { a, b, c, d } = $("#puzzle-board").getScreenCTM();
+  // Preserve the grab point and the current board scale, without constraining
+  // the preview to the table. Only a completed table drop changes game data.
+  const left = x - a * drag.offsetX - c * drag.offsetY,
+    top = y - b * drag.offsetX - d * drag.offsetY;
+  $("#drag-preview-pieces").setAttribute("transform", `matrix(${a} ${b} ${c} ${d} ${left} ${top})`);
+}
+function clearDragPreview(old) {
+  $("#drag-preview").hidden = true;
+  $("#drag-preview-pieces").innerHTML = "";
+  $("#puzzle-board").classList.remove("is-dragging");
+  if (old && $("#puzzle-board").hasPointerCapture(old.pointerId))
+    $("#puzzle-board").releasePointerCapture(old.pointerId);
+}
 function pointerDown(e) {
   if (panMode || drag || !game || paused || !e.isPrimary || e.button !== 0)
     return;
@@ -1254,7 +1290,9 @@ function pointerDown(e) {
     startY: e.clientY,
     offsetX: piece ? pt.x - piece.x : cw / 2,
     offsetY: piece ? pt.y - piece.y : ch / 2,
-    original: game.pieces.map((p) => (p ? { ...p } : null)),
+    members: piece
+      ? game.pieces.filter((p) => p && p.group === piece.group).map((p) => ({ ...p }))
+      : [{ id, x: 0, y: 0 }],
     moving: false,
   };
   updateRotationControl();
@@ -1271,39 +1309,34 @@ function pointerMove(e) {
   if (first) setPictureGuide(false);
   drag.moving = true;
   selected = drag.id;
-  const pt = boardPoint(e.clientX, e.clientY);
-  positionPiece(drag.id, pt.x - drag.offsetX, pt.y - drag.offsetY);
+  const overTray = withinTray(e.clientX, e.clientY),
+    targetChanged = overTray !== drag.overTray;
+  drag.overTray = overTray;
   if (first) {
     try {
       $("#puzzle-board").setPointerCapture(e.pointerId);
     } catch {}
     renderGame();
-  } else
-    for (const p of game.pieces) {
-      if (p && p.group === game.pieces[drag.id].group) {
-        const node = $(`#puzzle-board [data-piece="${p.id}"]`);
-        if (node) node.setAttribute("transform", `translate(${p.x},${p.y})`);
-      }
-    }
-  positionRotationControls();
-  $(".tray-panel").classList.toggle(
-    "is-drag-over",
-    withinTray(e.clientX, e.clientY),
-  );
+    renderDragPreview();
+  } else if (targetChanged) updateTrayReturnState();
+  moveDragPreview(e.clientX, e.clientY);
 }
 async function pointerUp(e) {
   if (!drag || e.pointerId !== drag.pointerId) return;
   const old = drag;
   drag = null;
+  clearDragPreview(old);
   updateRotationControl();
   if (!old.moving) return;
   ignoreClick = true;
   setTimeout(() => (ignoreClick = false), 0);
   if (!game) return;
   if (withinTray(e.clientX, e.clientY)) putPieceBack(old.id);
-  else if (withinBoard(e.clientX, e.clientY)) await finishPlacement(old.id);
-  else {
-    game.pieces = old.original;
+  else if (withinBoard(e.clientX, e.clientY)) {
+    const pt = boardPoint(e.clientX, e.clientY);
+    positionPiece(old.id, pt.x - old.offsetX, pt.y - old.offsetY);
+    await finishPlacement(old.id);
+  } else {
     selected = null;
     renderGame();
   }
@@ -1312,10 +1345,8 @@ function cancelDrag(e) {
   if (e && drag && e.pointerId !== drag.pointerId) return;
   const old = drag;
   drag = null;
-  if (old && $("#puzzle-board").hasPointerCapture(old.pointerId))
-    $("#puzzle-board").releasePointerCapture(old.pointerId);
+  clearDragPreview(old);
   if (old?.moving && game) {
-    game.pieces = old.original;
     selected = null;
     renderGame();
   }
@@ -1327,6 +1358,14 @@ $("#puzzle-board").addEventListener("pointerdown", pointerDown);
 window.addEventListener("pointermove", pointerMove, { passive: false });
 window.addEventListener("pointerup", pointerUp);
 window.addEventListener("pointercancel", cancelDrag);
+$("#puzzle-board").addEventListener("lostpointercapture", cancelDrag);
+window.addEventListener("blur", () => cancelDrag());
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && drag) {
+    e.preventDefault();
+    cancelDrag();
+  }
+});
 $("#piece-tray").addEventListener("click", (e) => {
   if (ignoreClick) return;
   const el = e.target.closest("[data-piece]");
@@ -1348,6 +1387,7 @@ $("#puzzle-board").addEventListener("click", (e) => {
 });
 $("#puzzle-board").addEventListener("keydown", (e) => {
   if (!game || paused) return;
+  if (drag?.moving && e.key !== "Escape") return;
   if (rotationKey(e)) return;
   if (e.key === "Escape") {
     cancelDrag();
