@@ -1332,6 +1332,9 @@ main:has(#game:not([hidden])) {
 #timer[data-long="true"] {
   font-size: 20px;
 }
+#placed-count[data-long="true"] {
+  font-size: 18px;
+}
 .table-area {
   grid-area: table;
   position: relative;

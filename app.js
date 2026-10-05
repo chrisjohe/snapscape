@@ -982,7 +982,9 @@ function putPieceBack(id) {
 function updateGameProgress() {
   const count = game.pieces.filter((p) => p?.locked).length;
   const total = game.pieces.length;
-  $("#placed-count").textContent = `${count} / ${total}`;
+  const label = `${count} / ${total}`;
+  $("#placed-count").textContent = label;
+  $("#placed-count").dataset.long = String(label.length > 6);
   const progress = $("#piece-progress");
   progress.setAttribute("aria-valuemax", total);
   progress.setAttribute("aria-valuenow", count);
