@@ -85,6 +85,7 @@ let data = emptyData(),
   showGuide = false,
   onlyEdges = false,
   keyboardCell = 0,
+  keyboardInput = false,
   toastTimeout,
   loadToken = 0,
   importToken = 0,
@@ -837,6 +838,22 @@ function renderGame() {
   updateRotationControl();
   helpTour?.refresh();
 }
+function updateKeyboardCursorVisibility() {
+  $("#keyboard-cursor")?.setAttribute("visibility",
+    keyboardInput && selected !== null && !drag?.moving ? "visible" : "hidden");
+}
+function setKeyboardInput(value) {
+  if (keyboardInput === value) return;
+  keyboardInput = value;
+  updateKeyboardCursorVisibility();
+}
+// Focus also moves to the board after clicks, so track the input itself.
+document.addEventListener("pointerdown", () => setKeyboardInput(false), { capture: true });
+document.addEventListener("keydown", (event) => {
+  if (event.ctrlKey || event.metaKey || event.altKey ||
+      ["Shift", "Control", "Alt", "Meta"].includes(event.key)) return;
+  setKeyboardInput(true);
+}, { capture: true });
 function updateBoardSelection() {
   for (const piece of game.pieces) {
     if (!piece) continue;
@@ -845,7 +862,7 @@ function updateBoardSelection() {
     node?.classList.toggle("is-dragging", isDraggedPiece(piece.id));
   }
   const cursor = $("#keyboard-cursor"), { cw, ch } = geometry(game), t = target(game, keyboardCell);
-  cursor.setAttribute("visibility", selected === null ? "hidden" : "visible");
+  updateKeyboardCursorVisibility();
   cursor.setAttribute("x", t.x + 2);
   cursor.setAttribute("y", t.y + 2);
   cursor.setAttribute("width", cw - 4);

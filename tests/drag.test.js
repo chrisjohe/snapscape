@@ -71,8 +71,16 @@ test("a piece or rotated group follows the grab point beyond the table at every 
   for (const scale of [0.5, 0.75, 1, 1.25, 1.5, 2]) {
     for (const group of [false, true]) {
       const a = dragApp({ group, twist: true, scale }), before = a.pieces();
+      await a.document.emit("keydown", { key: "Tab" });
+      a.run("selectPiece(0);");
+      assert.equal(a.node("#keyboard-cursor").getAttribute("visibility"), "visible");
+      await a.document.emit("pointerdown", { pointerType: "mouse" });
       await a.down();
       await a.move(995, 340); // Gap between the table and tray.
+      assert.equal(a.node("#keyboard-cursor").getAttribute("visibility"), "hidden");
+      await a.document.emit("keydown", { key: "ArrowRight" });
+      await a.board.emit("keydown", { key: "ArrowRight" });
+      assert.equal(a.node("#keyboard-cursor").getAttribute("visibility"), "hidden");
       const [sx, , , sy, x, y] = previewMatrix(a);
       assert.equal(sx, scale);
       assert.equal(sy, scale);
