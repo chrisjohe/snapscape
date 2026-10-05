@@ -7,6 +7,10 @@ node_modules/
 /AGENTS.md
 /assets/*prompts*.txt
 
+# Local portfolio showcase and generated showcase artwork.
+/showcase/
+/output/showcase/
+
 # Local source artwork; ship optimized delivery assets instead.
 /assets/snapscape-*.png
 /assets/previews/

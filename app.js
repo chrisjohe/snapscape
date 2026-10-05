@@ -24,6 +24,9 @@ import {
   validateData,
 } from "./engine.js?v=1.0.1";
 import { helpSteps, createHelpTour } from "./tour.js?v=1.0.1";
+// The local-only portfolio tools are optional and never imported on normal visits.
+const showcase = Boolean(window.location?.search &&
+  new URLSearchParams(window.location.search).has("showcase"));
 const $ = (s) => document.querySelector(s),
   KEY = "snapscape.v1",
   REVISION_KEY = `${KEY}.revision`;
@@ -125,7 +128,7 @@ function storageWarning(message) {
   $("#storage-warning").hidden = false;
 }
 try {
-  const raw = localStorage.getItem(KEY);
+  const raw = showcase ? null : localStorage.getItem(KEY);
   unreadableSave = raw;
   if (raw) data = validateData(JSON.parse(raw));
   unreadableSave = null;
@@ -136,6 +139,7 @@ try {
   );
 }
 function seconds() {
+  if (showcase) return elapsed;
   return elapsed + (!paused ? (performance.now() - runStart) / 1000 : 0);
 }
 function captureTime() {
@@ -154,13 +158,14 @@ function storedRevision(raw) {
   return JSON.parse(raw).revision ?? "";
 }
 function writeStoredData(value, raw = JSON.stringify(value)) {
+  if (showcase) return;
   // The payload is authoritative. A failed auxiliary-key write is harmless:
   // storedRevision checks the payload suffix before trusting cached metadata.
   localStorage.setItem(KEY, raw);
   try { localStorage.setItem(REVISION_KEY, value.revision); } catch {}
 }
 function save() {
-  if (helpSession) return true;
+  if (showcase || helpSession) return true;
   captureTime();
   if (storageBlocked) return false;
   try {
@@ -252,6 +257,7 @@ function adoptExternal(raw) {
   }
 }
 window.addEventListener("storage", (e) => {
+  if (showcase) return;
   if (e.storageArea && e.storageArea !== localStorage) return;
   if (e.key === KEY || e.key === null) adoptExternal(e.newValue);
 });
@@ -535,7 +541,7 @@ function openGame() {
   $("#puzzle-board").classList.remove("pan-mode");
   if (gameImageUrl?.startsWith("blob:") && gameImageUrl !== helpSession?.imageUrl)
     URL.revokeObjectURL(gameImageUrl);
-  if (helpSession) gameImageUrl = game.image;
+  if (helpSession || showcase) gameImageUrl = game.image;
   else {
     const bytes = Uint8Array.from(atob(game.image.split(",")[1]), (c) => c.charCodeAt(0));
     gameImageUrl = URL.createObjectURL(
@@ -564,7 +570,7 @@ function openGame() {
   renderGame();
   updatePlayNavigation();
   window.scrollTo({ top: 0, behavior: "auto" });
-  $("#puzzle-board").focus({ preventScroll: true });
+  if (!showcase) $("#puzzle-board").focus({ preventScroll: true });
 }
 function resumeSavedGame() {
   if (!data.active) return;
@@ -675,6 +681,7 @@ function leaveGame() {
   updateAll();
 }
 document.addEventListener("visibilitychange", () => {
+  if (showcase) return;
   if (helpSession) {
     if (document.hidden) {
       helpSession.paused = true;
@@ -690,12 +697,14 @@ window.addEventListener("pagehide", () => {
   captureTime();
   save();
 });
-setInterval(() => {
-  if (game && !paused) tick();
-}, 300);
-setInterval(() => {
-  if (game && !paused && !drag) save();
-}, 10000);
+if (!showcase) {
+  setInterval(() => {
+    if (game && !paused) tick();
+  }, 300);
+  setInterval(() => {
+    if (game && !paused && !drag) save();
+  }, 10000);
+}
 function tick() {
   if (!game) return;
   const time = formatTime(seconds());
@@ -1966,6 +1975,7 @@ $("#erase-button").addEventListener("click", () => {
   );
   $("#cancel-erase").onclick = closeModal;
   $("#confirm-erase").onclick = () => {
+    if (showcase) return;
     try {
       localStorage.removeItem(KEY);
       try { localStorage.removeItem(REVISION_KEY); } catch {}
@@ -1980,7 +1990,7 @@ $("#erase-button").addEventListener("click", () => {
   };
   $("#cancel-erase").focus();
 });
-if (document.modelContext?.registerTool) {
+if (!showcase && document.modelContext?.registerTool) {
   try {
     const controller = new AbortController();
     Promise.resolve(
@@ -2068,3 +2078,36 @@ boardResizeObserver.observe($(".game-layout"));
 boardResizeObserver.observe($(".game-heading"));
 window.addEventListener("resize", sizeBoard);
 window.visualViewport?.addEventListener("resize", sizeBoard);
+
+// Render the real app with isolated, repeatable data for the portfolio studio.
+// No alternate markup or styles: changes to the app appear here automatically.
+async function initializeShowcase() {
+  try {
+    const { readShowcaseOptions, createShowcaseData, showcasePhoto } =
+      await import("./showcase/demo.js?v=1.0.1");
+    const options = readShowcaseOptions(window.location.search);
+    document.body.inert = true;
+    document.body.dataset.showcase = options.view;
+    data = createShowcaseData(options);
+    if (options.view === "game") {
+      game = data.active;
+      openGame();
+      updateAll();
+    } else if (options.view === "setup") {
+      showPhoto(showcasePhoto(options.picture));
+      switchView("play", { showSetup: true });
+    } else {
+      switchView(options.view);
+    }
+    const pictures = options.view === "gallery"
+      ? data.records.map((record) => record.thumbnail)
+      : options.view === "achievements" ? [] : [showcasePhoto(options.picture).image];
+    await Promise.all(pictures.map(loadImage));
+    await document.fonts?.ready;
+    sizeBoard();
+    window.parent.postMessage({ type: "snapscape:showcase-ready" }, window.location.origin);
+  } catch {
+    window.parent.postMessage({ type: "snapscape:showcase-error" }, window.location.origin);
+  }
+}
+if (showcase) initializeShowcase();
