@@ -706,6 +706,19 @@ const navToggle = $("#nav-toggle"),
   headerContinue = $("#header-continue"),
   siteHeader = $(".site-header"),
   compactNavigation = window.matchMedia("(max-width: 960px)");
+function arrangeHeader() {
+  const help = $("#help-button"),
+    points = $(".points-total"),
+    restoreHelpFocus = document.activeElement === help;
+  if (compactNavigation.matches) {
+    navToggle.before(help);
+    $("#navigation-points").append(points);
+  } else {
+    $(".header-actions").append(help, points);
+  }
+  if (restoreHelpFocus) help.focus({ preventScroll: true });
+}
+arrangeHeader();
 function setNavigationOpen(open) {
   navToggle.setAttribute("aria-expanded", String(open));
   navToggle.setAttribute(
@@ -735,6 +748,7 @@ document.addEventListener("focusin", (event) => {
   if (!siteHeader.contains(event.target)) setNavigationOpen(false);
 });
 compactNavigation.addEventListener("change", () => {
+  arrangeHeader();
   if (helpSession) {
     setNavigationOpen(helpTour?.step.id === "navigation");
     return;
