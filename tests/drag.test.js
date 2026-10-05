@@ -58,6 +58,9 @@ function assertDragCleared(a) {
   assert.equal(a.node("#drag-preview-pieces").innerHTML, "");
   assert.equal(a.board.hasPointerCapture(7), false);
   assert.equal(a.node(".tray-panel").classList.contains("is-drag-over"), false);
+  if (a.run("!game || game.pieces.some((p) => p && !p.locked && p.group === 0)")) {
+    assert.equal(a.node('#puzzle-board [data-group="0"]').classList.contains("is-dragging"), false);
+  } else assert.doesNotMatch(a.board.innerHTML, /data-group="0"/);
   for (const id of [0, 1]) {
     if (a.run(`!game || Boolean(game.pieces[${id}])`)) {
       assert.equal(a.node(`#puzzle-board [data-piece="${id}"]`).classList.contains("is-dragging"), false);
@@ -89,7 +92,9 @@ test("a piece or rotated group follows the grab point beyond the table at every 
       assert.equal(a.node("#drag-preview").hidden, false);
       assert.equal(a.node('#puzzle-board [data-piece="0"]').classList.contains("is-dragging"), true);
       assert.equal(a.node('#puzzle-board [data-piece="1"]').classList.contains("is-dragging"), group);
+      assert.equal(a.node('#puzzle-board [data-group="0"]').classList.contains("is-dragging"), true);
       const markup = a.node("#drag-preview-pieces").innerHTML;
+      assert.equal((markup.match(/class="loose-piece-group is-held"/g) || []).length, 1);
       assert.equal((markup.match(/<image /g) || []).length, group ? 2 : 1);
       assert.match(markup, /rotate\(90 /);
       if (group) assert.match(markup, /translate\(0,150\)/);

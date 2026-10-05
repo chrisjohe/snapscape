@@ -10,6 +10,7 @@ import {
   target,
   edges,
   piecePath,
+  puzzleCornerRadius,
   placeGroup,
   returnGroupToTray,
   pieceRotation,
@@ -51,6 +52,33 @@ test("every difficulty has complementary neighbors and flat outer edges", () => 
       if (c === 0) assert.equal(e[3], 0);
       if (r === 0) assert.equal(e[0], 0);
       assert.ok(!piecePath(g, id).includes("NaN"));
+    }
+  }
+});
+test("only the four exterior corners have tangent quarter-circle contours at every size", () => {
+  for (const d of DIFFICULTIES) for (const ratio of [0.15, 2 / 3, 1, 1.5, 3, 7]) {
+    const g = game(d.id, ratio), { cw, ch } = geometry(g), radius = puzzleCornerRadius(g);
+    assert.ok(radius > 0 && radius <= 10);
+    assert.ok(radius <= Math.min(cw, ch) * 0.12);
+    const corners = new Map([
+      [0, { start: [0, radius], end: [radius, 0] }],
+      [d.cols - 1, { start: [cw - radius, 0], end: [cw, radius] }],
+      [d.cols * d.rows - 1, { start: [cw, ch - radius], end: [cw - radius, ch] }],
+      [d.cols * (d.rows - 1), { start: [radius, ch], end: [0, ch - radius] }],
+    ]);
+    for (const id of g.order) {
+      const path = piecePath(g, id), arcs = [...path.matchAll(/L ([^A-Z]+) A ([^A-Z]+)/g)];
+      assert.equal(arcs.length, corners.has(id) ? 1 : 0, `${d.id}, ${ratio}, piece ${id}`);
+      assert.doesNotMatch(path, /NaN|Infinity/);
+      if (!corners.has(id)) continue;
+      const start = arcs[0][1].trim().split(/[ ,]+/).map(Number),
+        arc = arcs[0][2].trim().split(/[ ,]+/).map(Number),
+        expected = corners.get(id);
+      for (let axis = 0; axis < 2; axis++) {
+        assert.ok(Math.abs(start[axis] - expected.start[axis]) < 1e-9);
+        assert.ok(Math.abs(arc[5 + axis] - expected.end[axis]) < 1e-9);
+      }
+      assert.deepEqual(arc.slice(0, 5), [radius, radius, 0, 0, 1]);
     }
   }
 });

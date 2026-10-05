@@ -1477,6 +1477,38 @@ main:has(#game:not([hidden])) {
   user-select: none;
   -webkit-user-select: none;
 }
+/* Offset contour layers keep depth inexpensive, even in a full Legend tray.
+   Each layer sits behind the entire group, never over its internal seams. */
+.loose-piece-group {
+  --piece-lift: 1;
+}
+.loose-piece-group.is-held,
+.tray-piece.selected .loose-piece-group {
+  --piece-lift: 2;
+}
+.piece-depth {
+  fill: #173f52;
+}
+.piece-shadow-outer {
+  opacity: 0.08;
+  transform: translateY(calc(5 * var(--piece-lift) * var(--piece-depth)));
+}
+.piece-shadow-inner {
+  opacity: 0.14;
+  transform: translateY(calc(3 * var(--piece-lift) * var(--piece-depth)));
+}
+.piece-rim {
+  fill: #304938;
+  opacity: 0.45;
+  transform: translateY(calc(1.5 * var(--piece-depth)));
+}
+.board-piece.locked .piece-highlight {
+  display: none;
+}
+.board-piece.locked .piece-outline {
+  stroke: #153c5233;
+  stroke-width: 0.8;
+}
 .board-piece {
   cursor: grab;
 }
@@ -1498,7 +1530,8 @@ main:has(#game:not([hidden])) {
   stroke: var(--bright);
   stroke-width: 4;
 }
-.board-piece.is-dragging {
+.board-piece.is-dragging,
+.loose-piece-group.is-dragging {
   visibility: hidden;
 }
 #puzzle-board.is-dragging {
@@ -1635,6 +1668,7 @@ main:has(#game:not([hidden])) {
   display: block;
   width: 100%;
   height: 100%;
+  overflow: visible;
 }
 .tray-return:focus-visible {
   border-color: var(--ink);
@@ -1679,6 +1713,7 @@ main:has(#game:not([hidden])) {
   height: 90px;
   display: block;
   pointer-events: none;
+  overflow: visible;
 }
 .pause-cover {
   position: absolute;

@@ -13,6 +13,7 @@ import {
   target,
   edges,
   piecePath,
+  puzzleCornerRadius,
   pieceRotation,
   pieceBounds,
   rotateGroup,
@@ -342,7 +343,8 @@ function renderPhotoPreview(photo) {
   const level = difficulty("breezy"),
     cornerGame = { difficulty: level.id, ratio: level.cols / level.rows, seed: 0 },
     corner = piecePath(cornerGame, level.cols * (level.rows - 1)),
-    cornerWidth = geometry(cornerGame).cw;
+    cornerWidth = geometry(cornerGame).cw,
+    radius = puzzleCornerRadius(cornerGame) * pieceSize / cornerWidth;
   // Center the photo itself; the loose piece overflows to the left without shifting it.
   preview.setAttribute("viewBox", `0 ${-pieceSize * 0.04} ${width} ${viewHeight}`);
   $("#photo-preview").style.setProperty("--preview-width", `${280 * width / viewHeight}px`);
@@ -351,7 +353,7 @@ function renderPhotoPreview(photo) {
     <image id="preview-photo-source" href="${safe(photo.image)}" width="${width}" height="${height}"/>
     <path id="preview-corner" d="${corner}" transform="translate(0 ${height - pieceSize}) scale(${pieceSize / cornerWidth})"/>
     <mask id="preview-photo-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="${height}" style="mask-type: luminance">
-      <rect width="${width}" height="${height}" fill="white"/>
+      <rect width="${width}" height="${height}" rx="${radius}" fill="white"/>
       <use href="#preview-corner" fill="black"/>
     </mask>
     <clipPath id="preview-piece-clip" clipPathUnits="userSpaceOnUse"><use href="#preview-corner"/></clipPath>
@@ -827,8 +829,21 @@ function buildPieceMarkup(id, prefix) {
   const { w, h, cw, ch } = geometry(game),
     t = target(game, id),
     path = piecePath(game, id),
-    clip = `${prefix}-clip-${id}`;
-  return `<g transform="rotate(${pieceRotation(game, id) * 90} ${cw / 2} ${ch / 2})"><defs><clipPath id="${clip}"><path d="${path}"/></clipPath></defs><path d="${path}" fill="#f8f5e9"/><image href="${gameImageUrl}" x="${-t.x}" y="${-t.y}" width="${w}" height="${h}" preserveAspectRatio="none" clip-path="url(#${clip})"/><path class="piece-outline" d="${path}" fill="none" stroke="#153c5260" stroke-width="1.2" vector-effect="non-scaling-stroke"/></g>`;
+    clip = `${prefix}-clip-${id}`,
+    shape = `${prefix}-shape-${id}`;
+  return `<g transform="rotate(${pieceRotation(game, id) * 90} ${cw / 2} ${ch / 2})"><defs><path id="${shape}" d="${path}"/><clipPath id="${clip}"><use href="#${shape}"/></clipPath></defs><use href="#${shape}" fill="#f8f5e9"/><image href="${gameImageUrl}" x="${-t.x}" y="${-t.y}" width="${w}" height="${h}" preserveAspectRatio="none" clip-path="url(#${clip})"/><path class="piece-highlight" d="${path}" fill="none" stroke="#fffefa" stroke-opacity="0.55" stroke-width="2.4" vector-effect="non-scaling-stroke" clip-path="url(#${clip})" pointer-events="none"/><path class="piece-outline" d="${path}" fill="none" stroke="#153c5260" stroke-width="1.2" vector-effect="non-scaling-stroke"/></g>`;
+}
+function pieceDepthUnit() {
+  const { cw, ch } = geometry(game);
+  return `${Math.min(1, Math.min(cw, ch) / 100)}px`;
+}
+function pieceDepthMarkup(members, prefix, origin = { x: 0, y: 0 }) {
+  const { cw, ch } = geometry(game),
+    silhouette = members.map((p) => `<use href="#${prefix}-shape-${p.id}" transform="translate(${p.x - origin.x},${p.y - origin.y}) rotate(${pieceRotation(game, p.id) * 90} ${cw / 2} ${ch / 2})"/>`).join("");
+  // Reuse only the contours. Filtering photo groups creates large offscreen
+  // surfaces for every loose piece. These three offset layers need no blur.
+  // Opacity belongs to each whole silhouette, so joined seams do not darken.
+  return `<g class="piece-depth" aria-hidden="true" pointer-events="none"><g class="piece-shadow-outer">${silhouette}</g><g class="piece-shadow-inner">${silhouette}</g><g class="piece-rim">${silhouette}</g></g>`;
 }
 function renderGame() {
   if (!game) return;
@@ -855,6 +870,12 @@ document.addEventListener("keydown", (event) => {
   setKeyboardInput(true);
 }, { capture: true });
 function updateBoardSelection() {
+  const selectedGroup = game.pieces[selected]?.group;
+  for (const group of new Set(game.pieces.filter((p) => p && !p.locked).map((p) => p.group))) {
+    const node = $(`#puzzle-board [data-group="${group}"]`);
+    node?.classList.toggle("is-held", selectedGroup === group);
+    node?.classList.toggle("is-dragging", Boolean(drag?.moving && game.pieces[drag.id]?.group === group));
+  }
   for (const piece of game.pieces) {
     if (!piece) continue;
     const node = $(`#puzzle-board [data-piece="${piece.id}"]`);
@@ -870,7 +891,7 @@ function updateBoardSelection() {
   $("#guide-image")?.setAttribute("opacity", showGuide ? ".4" : "0");
 }
 function renderBoard() {
-  const signature = JSON.stringify(game.pieces.map((p, id) => p && [p.id, p.x, p.y, p.locked, pieceRotation(game, id)]));
+  const signature = JSON.stringify(game.pieces.map((p, id) => p && [p.id, p.group, p.x, p.y, p.locked, pieceRotation(game, id)]));
   if (boardRender?.game === game && boardRender.image === gameImageUrl && boardRender.signature === signature) {
     updateBoardSelection();
     return;
@@ -882,17 +903,24 @@ function renderBoard() {
     "viewBox",
     `${-margin} ${-margin} ${w + margin * 2} ${h + margin * 2}`,
   );
+  board.style.setProperty("--piece-depth", pieceDepthUnit());
   sizeBoard();
-  let markup = `<rect x="0" y="0" width="${w}" height="${h}" rx="2" fill="#fbfaf4" stroke="#9eaf9a" stroke-width="2"/><image id="guide-image" href="${gameImageUrl}" width="${w}" height="${h}" opacity="${showGuide ? 0.4 : 0}" preserveAspectRatio="none" pointer-events="none"/>`;
+  const radius = puzzleCornerRadius(game);
+  let markup = `<defs><clipPath id="board-photo-clip"><rect width="${w}" height="${h}" rx="${radius}"/></clipPath></defs><rect x="0" y="0" width="${w}" height="${h}" rx="${radius}" fill="#fbfaf4" stroke="#9eaf9a" stroke-width="2"/><image id="guide-image" href="${gameImageUrl}" width="${w}" height="${h}" opacity="${showGuide ? 0.4 : 0}" preserveAspectRatio="none" clip-path="url(#board-photo-clip)" pointer-events="none"/>`;
   for (let r = 1; r < rows; r++)
     markup += `<path d="M0 ${r * ch}H${w}" stroke="#d4dcce" stroke-width="1" stroke-dasharray="3 8" pointer-events="none"/>`;
   for (let c = 1; c < cols; c++)
     markup += `<path d="M${c * cw} 0V${h}" stroke="#d4dcce" stroke-width="1" stroke-dasharray="3 8" pointer-events="none"/>`;
-  for (const p of [
-    ...game.pieces.filter((p) => p?.locked),
-    ...game.pieces.filter((p) => p && !p.locked),
-  ])
-    markup += `<g class="board-piece ${p.locked ? "locked" : ""} ${selected === p.id ? "selected" : ""}" data-piece="${p.id}" ${p.locked ? "" : 'tabindex="0" role="button"'} transform="translate(${p.x},${p.y})" aria-label="${p.locked ? "Placed" : "Loose"} piece ${p.id + 1}">${pieceMarkup(p.id, "board")}</g>`;
+  const piece = (p) => `<g class="board-piece ${p.locked ? "locked" : ""} ${selected === p.id ? "selected" : ""}" data-piece="${p.id}" ${p.locked ? "" : 'tabindex="0" role="button"'} transform="translate(${p.x},${p.y})" aria-label="${p.locked ? "Placed" : "Loose"} piece ${p.id + 1}">${pieceMarkup(p.id, "board")}</g>`;
+  markup += game.pieces.filter((p) => p?.locked).map(piece).join("");
+  const groups = new Map();
+  for (const p of game.pieces.filter((p) => p && !p.locked)) {
+    if (!groups.has(p.group)) groups.set(p.group, []);
+    groups.get(p.group).push(p);
+  }
+  // Composite depth once per connected silhouette, never at internal seams.
+  for (const [id, members] of groups)
+    markup += `<g class="loose-piece-group" data-group="${id}">${pieceDepthMarkup(members, "board")}${members.map(piece).join("")}</g>`;
   markup += `<rect id="keyboard-cursor" visibility="hidden" fill="none" stroke="#bd4b23" stroke-width="3" stroke-dasharray="10 6" pointer-events="none"/>`;
   board.innerHTML = markup;
   boardRender = { game, image: gameImageUrl, signature };
@@ -902,7 +930,7 @@ function trayPieceSvg(id, prefix) {
   const { cw, ch } = geometry(game),
     pad = Math.min(cw, ch) * 0.29,
     box = pieceBounds(game, id);
-  return `<svg viewBox="${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}" aria-hidden="true">${pieceMarkup(id, prefix)}</svg>`;
+  return `<svg viewBox="${box.x - pad} ${box.y - pad} ${box.width + pad * 2} ${box.height + pad * 2}" style="--piece-depth: ${pieceDepthUnit()}" aria-hidden="true"><g class="loose-piece-group${prefix === "held" ? " is-held" : ""}">${pieceDepthMarkup([{ id, x: 0, y: 0 }], prefix)}${pieceMarkup(id, prefix)}</g></svg>`;
 }
 function renderTray() {
   const ids = game.order.filter(
@@ -1267,11 +1295,12 @@ function isDraggedPiece(id) {
 }
 function renderDragPreview() {
   const anchor = drag.members.find((p) => p.id === drag.id);
+  $("#drag-preview-pieces").style.setProperty("--piece-depth", pieceDepthUnit());
   // Use separate clip IDs and group-relative positions. The fixed SVG lives
   // outside the scrollable table, so neither its edge nor the tray clips it.
-  $("#drag-preview-pieces").innerHTML = drag.members.map((p) =>
+  $("#drag-preview-pieces").innerHTML = `<g class="loose-piece-group is-held">${pieceDepthMarkup(drag.members, "drag", anchor)}${drag.members.map((p) =>
     `<g class="board-piece ${p.id === drag.id ? "selected" : ""}" transform="translate(${p.x - anchor.x},${p.y - anchor.y})">${pieceMarkup(p.id, "drag")}</g>`,
-  ).join("");
+  ).join("")}</g>`;
   $("#drag-preview").hidden = false;
   $("#puzzle-board").classList.add("is-dragging");
 }

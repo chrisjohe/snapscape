@@ -185,27 +185,42 @@ export function edges(game, id) {
     c === 0 ? 0 : -hash(1000 + r * cols + c - 1),
   ];
 }
+export function puzzleCornerRadius(game) {
+  const { cw, ch } = geometry(game);
+  return Math.min(10, Math.min(cw, ch) * 0.12);
+}
 // Edges are drawn clockwise. Adjacent pieces share the same curve, reversed.
 export function piecePath(game, id) {
   const { cw, ch } = geometry(game),
     tab = Math.min(cw, ch) * 0.22,
-    e = edges(game, id);
-  let p = "M 0 0";
-  function side(x, y, dx, dy, sign) {
+    e = edges(game, id),
+    radius = puzzleCornerRadius(game),
+    tl = e[3] === 0 && e[0] === 0 ? radius : 0,
+    tr = e[0] === 0 && e[1] === 0 ? radius : 0,
+    br = e[1] === 0 && e[2] === 0 ? radius : 0,
+    bl = e[2] === 0 && e[3] === 0 ? radius : 0;
+  let p = `M ${tl} 0`;
+  function side(x, y, dx, dy, sign, endInset = 0) {
     const nx = dy / Math.hypot(dx, dy),
       ny = -dx / Math.hypot(dx, dy);
     const pt = (t, n = 0) => `${x + dx * t + nx * n},${y + dy * t + ny * n}`;
     if (!sign) {
-      p += ` L ${pt(1)}`;
+      p += ` L ${pt(1 - endInset / Math.hypot(dx, dy))}`;
       return;
     }
     const t = tab * sign;
     p += ` L ${pt(0.34)} C ${pt(0.45)},${pt(0.42, -t * 0.12)},${pt(0.42, t * 0.25)} C ${pt(0.28, t * 1.2)},${pt(0.72, t * 1.2)},${pt(0.58, t * 0.25)} C ${pt(0.58, -t * 0.12)},${pt(0.55)},${pt(0.66)} L ${pt(1)}`;
   }
-  side(0, 0, cw, 0, e[0]);
-  side(cw, 0, 0, ch, e[1]);
-  side(cw, ch, -cw, 0, e[2]);
-  side(0, ch, 0, -ch, e[3]);
+  // Only the four corners with two exterior edges are rounded. The same
+  // contour travels with the piece in the tray, on the table and while held.
+  side(0, 0, cw, 0, e[0], tr);
+  if (tr) p += ` A ${tr} ${tr} 0 0 1 ${cw} ${tr}`;
+  side(cw, 0, 0, ch, e[1], br);
+  if (br) p += ` A ${br} ${br} 0 0 1 ${cw - br} ${ch}`;
+  side(cw, ch, -cw, 0, e[2], bl);
+  if (bl) p += ` A ${bl} ${bl} 0 0 1 0 ${ch - bl}`;
+  side(0, ch, 0, -ch, e[3], tl);
+  if (tl) p += ` A ${tl} ${tl} 0 0 1 ${tl} 0`;
   return p + " Z";
 }
 export function placeGroup(game, id) {
