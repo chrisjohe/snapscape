@@ -145,6 +145,7 @@ test("the setup title can be edited without changing a saved game, then starts a
   const a = app(), before = a.storage.get(KEY);
   a.run('prepareImage = async () => ({ image: "data:image/jpeg;base64,AAAA", ratio: 1.5 });');
   await a.node("#sample-button").click();
+  await a.node("#sample-surprise").click();
   const suggested = a.node("#setup-puzzle-name").textContent;
   assert.ok(suggested.length > 0);
   assert.equal(a.node("#setup-title").hidden, false);
@@ -528,6 +529,7 @@ test("a random picture keeps its identity through renaming, resume, completion, 
       return { image: "data:image/jpeg;base64,AAAA", ratio: 1.5 };
     };`);
   await a.node("#sample-button").click();
+  await a.node("#sample-surprise").click();
   const sampleId = a.run("selectedPhoto.sampleId");
   assert.ok(engine.SAMPLE_SNAPSCAPES.includes(sampleId));
   assert.equal(a.run("loadedSource"), `./assets/snapscape-${sampleId}.jpg`);
@@ -557,12 +559,16 @@ test("a random picture keeps its identity through renaming, resume, completion, 
   await restored.node("#confirm-import").click();
   const imported = JSON.parse(restored.storage.get(KEY));
   assert.equal(imported.records[0].sampleId, sampleId);
+  await restored.node("#sample-button").click();
+  assert.match(restored.node("#modal-content").innerHTML, /1 of 15 completed/);
+  assert.ok(restored.run(`sampleChoiceMarkup("${sampleId}", completedSampleIds(data.records).has("${sampleId}"))`).includes('class="sample-completed">'));
 });
 
 test("replacing a sample with an upload clears its identity even when the filename matches", async () => {
   const a = app(new Map());
   a.run('prepareImage = async () => ({ image: "data:image/jpeg;base64,AAAA", ratio: 1.5 });');
   await a.node("#sample-button").click();
+  await a.node("#sample-surprise").click();
   assert.ok(a.run("selectedPhoto.sampleId"));
   await a.run('useFile({ size: 100, type: "image/png", name: "snapscape-beach.png" });');
   a.node('[name=difficulty]:checked').value = "breezy";

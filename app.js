@@ -22,15 +22,33 @@ import {
   returnGroupToTray,
   ACHIEVEMENTS,
   SAMPLE_SNAPSCAPES,
+  completedSampleIds,
   validateData,
-} from "./engine.js?v=1.0.1";
-import { helpSteps, createHelpTour } from "./tour.js?v=1.0.1";
+} from "./engine.js?v=1.0.2";
+import { helpSteps, createHelpTour } from "./tour.js?v=1.0.2";
 // The local-only portfolio tools are optional and never imported on normal visits.
 const showcase = Boolean(window.location?.search &&
   new URLSearchParams(window.location.search).has("showcase"));
 const $ = (s) => document.querySelector(s),
   KEY = "snapscape.v1",
   REVISION_KEY = `${KEY}.revision`;
+const SAMPLE_NAMES = {
+  beach: "Beach",
+  bike: "Bike Ride",
+  bookstore: "Bookstore",
+  diner: "Diner",
+  fishing: "Fishing",
+  football: "Football",
+  gymnastics: "Gymnastics",
+  "interstate-95": "Interstate 95",
+  kajak: "Kayaking",
+  lecture: "Lecture Hall",
+  mall: "Shopping Mall",
+  miami: "Miami",
+  oranges: "Oranges",
+  "st-augustine": "St. Augustine",
+  tennis: "Tennis",
+};
 const PUZZLE_TITLES = [
   "A little Florida sunshine",
   "Gator state of mind",
@@ -380,6 +398,7 @@ function showPhoto(photo) {
   $("#remove-photo-button").hidden = false;
   $("#upload-zone").classList.add("has-photo");
   setPhotoLoading(false);
+  refreshSamplePicker();
   if (focusWasOnUpload)
     $("#remove-photo-button").focus({ preventScroll: true });
 }
@@ -399,20 +418,72 @@ function removePhoto() {
   $("#photo-input").focus({ preventScroll: true });
   announce("Photo removed. Choose another picture for your puzzle.");
 }
-async function useSample() {
+async function useSample(sampleId) {
+  if (sampleId === undefined) {
+    const choices = SAMPLE_SNAPSCAPES.filter((id) => id !== selectedPhoto?.sampleId);
+    sampleId = choices[Math.floor(Math.random() * choices.length)];
+  }
+  if (!SAMPLE_SNAPSCAPES.includes(sampleId)) return;
   const token = ++loadToken;
-  const sampleId = SAMPLE_SNAPSCAPES[Math.floor(Math.random() * SAMPLE_SNAPSCAPES.length)];
   setPhotoLoading(true);
   try {
     const photo = await prepareImage(`./assets/snapscape-${sampleId}.jpg`);
     if (token !== loadToken) return;
     showPhoto({ ...photo, ownPhoto: false, sampleId });
+    announce(`${SAMPLE_NAMES[sampleId]} is ready. Pick a challenge and start snapping.`);
   } catch (error) {
     if (token === loadToken) {
       toast(error.message);
       setPhotoLoading(false);
     }
   }
+}
+function sampleChoiceMarkup(id, completed) {
+  const current = selectedPhoto?.sampleId === id;
+  return `<button class="sample-choice${current ? " is-current" : ""}" id="sample-choice-${id}" type="button"${current ? ' aria-current="true"' : ""}>
+    <span class="sample-choice-picture">
+      <img src="./assets/thumbnails/picker/snapscape-${id}.jpg" alt="" width="432" height="324" decoding="async">
+      <span class="sample-completed"${completed ? "" : " hidden"}>✓ Completed</span>
+    </span>
+    <span class="sample-choice-name">${SAMPLE_NAMES[id]}</span>
+  </button>`;
+}
+function refreshSamplePicker() {
+  if (!$("#modal").open || $("#modal").getAttribute("aria-labelledby") !== "sample-picker-title") return;
+  const completed = completedSampleIds(data.records);
+  $("#sample-progress").textContent = `${completed.size} of ${SAMPLE_SNAPSCAPES.length} completed`;
+  for (const id of SAMPLE_SNAPSCAPES) {
+    $(`#sample-choice-${id} .sample-completed`).hidden = !completed.has(id);
+    const button = $(`#sample-choice-${id}`), current = selectedPhoto?.sampleId === id;
+    button.classList.toggle("is-current", current);
+    if (current) button.setAttribute("aria-current", "true");
+    else button.removeAttribute("aria-current");
+  }
+}
+function openSamplePicker() {
+  const completed = completedSampleIds(data.records);
+  modal(`<div class="sample-picker">
+    <h2 id="sample-picker-title" tabindex="-1">Choose a Snapscape</h2>
+    <p class="sample-picker-intro">Pick a picture or let Gator surprise you.</p>
+    <div class="sample-choice-grid">
+      <button class="sample-choice sample-surprise" id="sample-surprise" type="button">
+        <span class="sample-choice-picture"><img src="./assets/gator-surprise.png" alt="" width="600" height="450" decoding="async"></span>
+        <span class="sample-choice-name">Surprise me</span>
+      </button>
+      ${SAMPLE_SNAPSCAPES.map((id) => sampleChoiceMarkup(id, completed.has(id))).join("")}
+    </div>
+    <p class="sample-picker-progress"><span>Sunshine Explorer</span><span id="sample-progress" role="status">${completed.size} of ${SAMPLE_SNAPSCAPES.length} completed</span></p>
+  </div>`, "sample-picker-title");
+  const choose = (id) => {
+    closeModal();
+    $("#sample-button").focus({ preventScroll: true });
+    return useSample(id);
+  };
+  $("#sample-surprise").addEventListener("click", () => choose());
+  for (const id of SAMPLE_SNAPSCAPES)
+    $(`#sample-choice-${id}`).addEventListener("click", () => choose(id));
+  $("#modal").scrollTop = 0;
+  $("#sample-picker-title").focus({ preventScroll: true });
 }
 async function useFile(file) {
   if (!file) return;
@@ -465,8 +536,9 @@ $("#upload-zone").addEventListener("drop", (e) => {
 window.addEventListener("dragover", (e) => e.preventDefault());
 window.addEventListener("drop", (e) => e.preventDefault());
 $("#sample-button").disabled = false;
-$("#sample-button").addEventListener("click", useSample);
+$("#sample-button").addEventListener("click", openSamplePicker);
 function modal(html, labelledBy) {
+  $("#modal").classList.toggle("sample-picker-dialog", labelledBy === "sample-picker-title");
   $("#modal-content").innerHTML = html;
   if (labelledBy) $("#modal").setAttribute("aria-labelledby", labelledBy);
   else $("#modal").removeAttribute("aria-labelledby");
@@ -1624,6 +1696,7 @@ function updateAll() {
   updatePlayNavigation();
   renderGallery();
   renderAchievements(progress);
+  refreshSamplePicker();
 }
 function renderGallery() {
   const count = data.records.length;
@@ -2170,7 +2243,7 @@ window.visualViewport?.addEventListener("resize", sizeBoard);
 async function initializeShowcase() {
   try {
     const { readShowcaseOptions, createShowcaseData, showcasePhoto } =
-      await import("./showcase/demo.js?v=1.0.1");
+      await import("./showcase/demo.js?v=1.0.2");
     const options = readShowcaseOptions(window.location.search);
     document.body.inert = true;
     document.body.dataset.showcase = options.view;

@@ -2,9 +2,9 @@
 
 Generated with the built-in image-generation tool for this project. The mascot is saved as `mascot.png`. Delivery copies were resized/compressed for the web. Neither asset uses official team logos.
 
-## Random snapscapes — supplied picture collection
+## Choose a Snapscape — supplied picture collection
 
-The random picture selection contains fifteen supplied pictures: the original twelve added on 1 October 2026, plus the approved lecture, tennis, and gymnastics illustrations added on 2 October 2026.
+The picture chooser contains fifteen supplied pictures, each directly selectable: the original twelve added on 1 October 2026, plus the approved lecture, tennis, and gymnastics illustrations added on 2 October 2026. Its first tile, “Surprise me”, randomly chooses any supplied picture except the one currently selected. Completed pictures remain eligible and replayable; their badges share Sunshine Explorer’s saved picture identities.
 
 - `snapscape-beach.jpg`
 - `snapscape-bike.jpg`
@@ -26,7 +26,26 @@ Each image is 1448 × 1086 pixels (4:3), without an alpha channel. The app loads
 
 The three additions were generated with the built-in image-generation tool using the mascot and existing puzzle illustrations as references. The approved gymnastics revision has human participants in the background; the approved lecture revision seats Gator facing the lecturer. Tennis uses the approved first version. The JPEG delivery copies use those approved images. The approved PNG previews and two earlier lecture and gymnastics drafts are retained locally in `assets/previews/`, which is excluded from Git. The favicon master (`app-icon-1024.png`) and original gallery portrait (`gator-collection.png`) are also retained locally and excluded from Git. Only the delivery assets are tracked. Sunshine Explorer now requires all fifteen distinct pictures, with its existing 100 Snap Points reward.
 
-The random button previews bookstore, beach, oranges, Miami, and kayak using 144 × 108 JPEG delivery copies in `assets/thumbnails/`, resized with macOS `sips` at JPEG quality 78. The five files total 62,405 bytes. CSS crops their display into small decorative cards; the source pictures and playable puzzles retain the complete images.
+The chooser’s entry button previews bookstore, beach, oranges, Miami, and kayak using 144 × 108 JPEG delivery copies in `assets/thumbnails/`, resized with macOS `sips` at JPEG quality 78. The five files total 62,405 bytes. CSS crops their display into small decorative cards; the source pictures and playable puzzles retain the complete images.
+
+The dialog loads separate 432 × 324 JPEG previews for all fifteen pictures from `assets/thumbnails/picker/`, generated from the playable JPEGs with macOS `sips` at quality 78 on 5 October 2026. The previews preserve the full 4:3 composition. Only the chosen picture loads at playable resolution; the initial setup keeps its existing five small preview files.
+
+## Surprise me — `gator-surprise.png`
+
+Generated with the built-in image-generation tool on 5 October 2026, using `mascot.png` as the character and style reference. Saved as a 600 × 450 PNG with macOS `sips`, preserving the generated transparent alpha channel. Used only for the first chooser tile; it is not a sixteenth playable picture and receives no completion badge.
+
+Final prompt:
+
+```text
+Use case: illustration-story.
+Asset type: one transparent PNG mascot cutout for the first "Surprise me" tile in Snapscape's picture chooser.
+Input image 1: character identity and illustration-style reference, not a target to overwrite.
+Primary request: create a new pose of this exact friendly alligator, cheerfully surprised, with wide eyes, a slightly open delighted mouth and both small hands raised near shoulder height, palms open.
+Preserve the rounded long muzzle, forest-green skin, cream cheeks and belly, orange neckerchief, friendly teeth, and charming editorial cut-paper illustration with subtle tactile paper texture.
+Composition: compact waist-up portrait, centered in a landscape 4:3 canvas; the head and both hands fully visible, generous small safe margins, clearly readable at 180 pixels wide. No legs or tail.
+Scene/backdrop: genuinely transparent background with alpha. Warm, playful, welcoming surprise, no fear.
+Constraints: one character only; no lettering, question marks, text, cards, objects, scenery, ground, frame, logos, watermark, backdrop or cast shadow. This is a UI mascot illustration; the label is added separately in HTML.
+```
 
 ## Snap-together symbol — `snap-pieces.svg`
 

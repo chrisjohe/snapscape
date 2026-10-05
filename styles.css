@@ -2141,6 +2141,110 @@ dialog::backdrop {
   color: var(--muted);
   font-size: 15px;
 }
+#modal.sample-picker-dialog {
+  max-width: min(820px, calc(100vw - 28px));
+  max-height: calc(100vh - 28px);
+  max-height: calc(100dvh - 28px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 28px;
+}
+#modal-content #sample-picker-title {
+  margin: 0 40px 6px 0;
+  font-size: clamp(25px, 4vw, 33px);
+}
+#modal-content .sample-picker-intro {
+  margin: 0 0 20px;
+  font-size: 14px;
+}
+.sample-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.sample-choice {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  text-align: center;
+}
+.sample-choice.is-current {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 1px var(--orange);
+}
+.sample-choice-picture {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: 11px 11px 0 0;
+  background: #eaf0e6;
+}
+.sample-choice-picture img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.sample-choice-name {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  padding: 9px 5px;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+.sample-surprise .sample-choice-picture {
+  background: #f5eed6;
+}
+.sample-surprise img {
+  padding: 8px;
+}
+.sample-completed {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--green);
+  box-shadow: 0 1px 5px #173f521a;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+#modal-content .sample-picker-progress {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin: 18px 0 0;
+  font-size: 12px;
+}
+.sample-picker-progress > :first-child {
+  color: var(--green);
+  font-weight: 650;
+}
+@media (hover: hover) and (pointer: fine) {
+  .sample-choice:hover {
+    border-color: var(--green);
+    box-shadow: 0 2px 8px #173f521a;
+  }
+}
+@media (max-width: 620px) {
+  #modal.sample-picker-dialog {
+    padding: 32px 18px 20px;
+  }
+  .sample-choice-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 .dialog-actions {
   display: flex;
   justify-content: center;

@@ -291,12 +291,13 @@ export function returnGroupToTray(game, id) {
   for (const member of members) game.pieces[member.id] = null;
   return members.length;
 }
-const completedSampleCount = (records) =>
+export const completedSampleIds = (records) =>
   new Set(
     records
       .filter((r) => !r.ownPhoto && SAMPLE_SNAPSCAPES.includes(r.sampleId))
       .map((r) => r.sampleId),
-  ).size;
+  );
+const completedSampleCount = (records) => completedSampleIds(records).size;
 export const collectedPoints = (records) =>
   records.reduce((sum, record) => sum + Math.round(record.points), 0);
 const completedDifficultyCount = (records) =>

@@ -15,7 +15,10 @@ test("literal app controls exist in the document or generated markup", () => {
 
 test("bundled assets referenced by markup, styles, and dynamic game lists exist", () => {
   const assets = new Set(Array.from(`${html}\n${app}\n${tour}\n${css}`.matchAll(/(?:\.\/)?assets\/([\w./-]+\.(?:png|jpg|svg|ico))/g), ([, path]) => path));
-  for (const id of SAMPLE_SNAPSCAPES) assets.add(`snapscape-${id}.jpg`);
+  for (const id of SAMPLE_SNAPSCAPES) {
+    assets.add(`snapscape-${id}.jpg`);
+    assets.add(`thumbnails/picker/snapscape-${id}.jpg`);
+  }
   for (const { icon } of ACHIEVEMENTS) assets.add(`${icon}_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg`);
   for (const { id } of DIFFICULTIES) assets.add(id === "snappy" ? "mascot.png" : `gator-${id}.png`);
   for (const asset of assets) {
