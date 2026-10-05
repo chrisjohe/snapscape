@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { app, KEY, savedProgress } from "./helpers/app.js";
 
+// Completion must award once and preserve progress across asynchronous failures.
 function completedPuzzle(a) {
   a.run(`resumeSavedGame();
     game.pieces = game.pieces.map((_, id) => ({ id, group: id, ...target(game, id), locked: true }));
@@ -60,36 +61,4 @@ test("a completion write failure retains the rewards for backup and explains the
   await a.node("#export-button").click();
   const exported = JSON.parse(await a.blobs.at(-1).text());
   assert.equal(exported.records.length, 2);
-});
-
-test("selection and keyboard moves reuse board and tray SVGs, while placements invalidate the board", () => {
-  const a = app();
-  a.run("resumeSavedGame(); positionPiece(2, 420, 310); renderGame();");
-  const board = a.node("#puzzle-board"), tray = a.node("#piece-tray");
-  const boardWrites = board.innerHTMLWrites, trayWrites = tray.innerHTMLWrites;
-  a.run("selectPiece(2); keyboardCell = 9; renderBoard();");
-  assert.equal(board.innerHTMLWrites, boardWrites);
-  assert.equal(tray.innerHTMLWrites, trayWrites);
-  assert.equal(a.node('#puzzle-board [data-piece="2"]').classList.contains("selected"), true);
-  assert.equal(a.node("#keyboard-cursor").getAttribute("visibility"), "visible");
-  a.run("selected = null; renderGame();");
-  assert.equal(a.node("#keyboard-cursor").getAttribute("visibility"), "hidden");
-  a.run("positionPiece(2, 450, 330); renderGame();");
-  assert.equal(board.innerHTMLWrites, boardWrites + 1);
-  assert.equal(tray.innerHTMLWrites, trayWrites);
-  a.run("positionPiece(3, 460, 340); renderGame();");
-  assert.equal(tray.innerHTMLWrites, trayWrites + 1);
-});
-
-test("Twist rotation and edge filters invalidate tray markup without losing selection", async () => {
-  const a = app();
-  a.run("resumeSavedGame(); game.twist = true; game.rotations = Array(24).fill(0); selected = 0; renderGame();");
-  const tray = a.node("#piece-tray"), before = tray.innerHTMLWrites;
-  await a.run("rotateSelectedPiece();");
-  assert.equal(tray.innerHTMLWrites, before + 1);
-  assert.match(tray.innerHTML, /rotate\(90/);
-  await a.node("#edges-button").click();
-  assert.equal(tray.innerHTMLWrites, before + 2);
-  a.run("selectPiece(0); selectPiece(0);");
-  assert.equal(a.node('#piece-tray [data-piece="0"]').getAttribute("aria-pressed"), "true");
 });

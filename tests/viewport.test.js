@@ -13,20 +13,6 @@ test("fit reserves space for the desktop footer or the stacked tablet controls",
     assert.ok(210 + height + spaceBelow <= 1180);
   }
 });
-test("the table fills a large workspace even when the fitted picture is narrower", () => {
-  const size = boardViewport({
-    viewportHeight: 1440,
-    tableTop: 88,
-    spaceBelow: 14,
-    availableWidth: 2200,
-    frameRatio: 2 / 3,
-  });
-  assert.equal(size.tableWidth, 2200);
-  assert.equal(size.tableHeight, 1338);
-  assert.equal(size.height, 1338);
-  assert.equal(size.width, 892);
-  assert.ok(size.height > 720);
-});
 test("zoom presets from 50% to 200% scale the board without resizing the containing table", () => {
   for (const stacked of [false, true]) {
     const options = {

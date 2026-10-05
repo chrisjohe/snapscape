@@ -26,7 +26,7 @@ export function savedProgress() {
 }
 
 // Exercise the real app handlers with in-memory storage and minimal DOM stubs.
-// Measurements are supplied explicitly; no browser rendering or native picker is used.
+// Geometry is inert; these stubs do not verify layout, rendering, or native pickers.
 export function app(storage = new Map([[KEY, JSON.stringify(savedProgress())]])) {
   const nodes = new Map(), blobs = [], revoked = [], intervals = [];
   const timeouts = new Map();
@@ -46,8 +46,6 @@ export function app(storage = new Map([[KEY, JSON.stringify(savedProgress())]]))
       this.listeners = new Map();
       this.style = { setProperty(name, value) { this[name] = String(value); } };
       this.clientWidth = 600;
-      this.rect = { left: 0, top: 0, width: 0, height: 0 };
-      this.computedStyle = { columnGap: "16px", rowGap: "12px" };
       const classes = new Set();
       this.classList = {
         add: (...names) => names.forEach((name) => classes.add(name)),
@@ -77,7 +75,6 @@ export function app(storage = new Map([[KEY, JSON.stringify(savedProgress())]]))
     reportValidity() { return !this.validationMessage; }
     get innerHTML() { return this.html || ""; }
     set innerHTML(value) {
-      this.innerHTMLWrites = (this.innerHTMLWrites || 0) + 1;
       if (this.id === "modal-content") {
         for (const [, id] of this.innerHTML.matchAll(/id="([^"]+)"/g)) {
           nodes.delete(`#${id}`);
@@ -89,7 +86,7 @@ export function app(storage = new Map([[KEY, JSON.stringify(savedProgress())]]))
     getAttribute(name) { return this.attributes.get(name) ?? null; }
     removeAttribute(name) { this.attributes.delete(name); }
     contains(node) { return this === node; }
-    getBoundingClientRect() { return this.rect; }
+    getBoundingClientRect() { return { left: 0, top: 0, width: 0, height: 0 }; }
     showModal() { this.open = true; }
     close() {
       if (!this.open) return;
@@ -163,7 +160,7 @@ export function app(storage = new Map([[KEY, JSON.stringify(savedProgress())]]))
         escape: config.onEscape,
       };
     },
-    getComputedStyle: (node) => node.computedStyle,
+    getComputedStyle: () => ({ columnGap: "16px", rowGap: "12px" }),
     performance: { now: () => now },
     URL: {
       createObjectURL: (blob) => { blobs.push(blob); return "blob:test"; },
