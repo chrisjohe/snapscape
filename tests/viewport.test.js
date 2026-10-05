@@ -28,13 +28,13 @@ test("the table fills a large workspace even when the fitted picture is narrower
   assert.ok(size.height > 720);
 });
 test("zoom presets from 50% to 200% scale the board without resizing the containing table", () => {
-  for (const mobile of [false, true]) {
+  for (const stacked of [false, true]) {
     const options = {
       viewportHeight: 1180,
       tableTop: 320,
-      availableWidth: mobile ? 360 : 900,
+      availableWidth: stacked ? 360 : 900,
       frameRatio: 0.7,
-      mobile,
+      spaceBelow: stacked ? 210 : 54,
     };
     const base = boardViewport(options);
     for (const zoom of [0.5, 0.75, 1, 1.25, 1.5, 2]) {
@@ -85,7 +85,7 @@ test("short windows retain a usable table and unknown zoom resets to fit", () =>
     const small = boardViewport({
       viewportHeight: 400,
       tableTop: 320,
-      mobile: true,
+      spaceBelow: 210,
       zoom,
     });
     assert.equal(small.height, 240);

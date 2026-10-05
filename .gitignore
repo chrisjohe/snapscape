@@ -6,3 +6,9 @@ node_modules/
 /TESTS.md
 /AGENTS.md
 /assets/*prompts*.txt
+
+# Local source artwork; ship optimized delivery assets instead.
+/assets/snapscape-*.png
+/assets/previews/
+/assets/app-icon-1024.png
+/assets/gator-collection.png

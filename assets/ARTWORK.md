@@ -4,27 +4,27 @@ Generated with the built-in image-generation tool for this project. The mascot i
 
 ## Random snapscapes — supplied picture collection
 
-The random picture selection contains fifteen supplied PNGs: the original twelve added on 1 October 2026, plus the approved lecture, tennis, and gymnastics illustrations added on 2 October 2026.
+The random picture selection contains fifteen supplied pictures: the original twelve added on 1 October 2026, plus the approved lecture, tennis, and gymnastics illustrations added on 2 October 2026.
 
-- `snapscape-beach.png`
-- `snapscape-bike.png`
-- `snapscape-bookstore.png`
-- `snapscape-diner.png`
-- `snapscape-fishing.png`
-- `snapscape-football.png`
-- `snapscape-gymnastics.png`
-- `snapscape-interstate-95.png`
-- `snapscape-kajak.png`
-- `snapscape-lecture.png`
-- `snapscape-mall.png`
-- `snapscape-miami.png`
-- `snapscape-oranges.png`
-- `snapscape-st-augustine.png`
-- `snapscape-tennis.png`
+- `snapscape-beach.jpg`
+- `snapscape-bike.jpg`
+- `snapscape-bookstore.jpg`
+- `snapscape-diner.jpg`
+- `snapscape-fishing.jpg`
+- `snapscape-football.jpg`
+- `snapscape-gymnastics.jpg`
+- `snapscape-interstate-95.jpg`
+- `snapscape-kajak.jpg`
+- `snapscape-lecture.jpg`
+- `snapscape-mall.jpg`
+- `snapscape-miami.jpg`
+- `snapscape-oranges.jpg`
+- `snapscape-st-augustine.jpg`
+- `snapscape-tennis.jpg`
 
-Each image is 1448 × 1086 pixels (4:3), without an alpha channel. The app loads only the selected full-size picture and uses the existing local resize/compression flow, preserving the complete image and its proportions. The supplied PNG files are unchanged.
+Each image is 1448 × 1086 pixels (4:3), without an alpha channel. The app loads only the selected full-size picture and uses the existing local resize/compression flow, preserving the complete image and its proportions. For version 1.0.1, the supplied opaque PNGs were converted to full-resolution JPEG delivery copies with macOS `sips` at quality 85. The fifteen playable files total 10,110,701 bytes, down from 39,774,614 bytes (74.6% smaller). Composition, dimensions, and picture identities are preserved; the original PNGs are retained locally and excluded from Git via `.gitignore`.
 
-The three additions were generated with the built-in image-generation tool using the mascot and existing puzzle illustrations as references. The approved gymnastics revision has human participants in the background; the approved lecture revision seats Gator facing the lecturer. Tennis uses the approved first version. The playable files are byte-for-byte copies of those approved previews. Sunshine Explorer now requires all fifteen distinct pictures, with its existing 100 Snap Points reward.
+The three additions were generated with the built-in image-generation tool using the mascot and existing puzzle illustrations as references. The approved gymnastics revision has human participants in the background; the approved lecture revision seats Gator facing the lecturer. Tennis uses the approved first version. The JPEG delivery copies use those approved images. The approved PNG previews and two earlier lecture and gymnastics drafts are retained locally in `assets/previews/`, which is excluded from Git. The favicon master (`app-icon-1024.png`) and original gallery portrait (`gator-collection.png`) are also retained locally and excluded from Git. Only the delivery assets are tracked. Sunshine Explorer now requires all fifteen distinct pictures, with its existing 100 Snap Points reward.
 
 The random button previews bookstore, beach, oranges, Miami, and kayak using 144 × 108 JPEG delivery copies in `assets/thumbnails/`, resized with macOS `sips` at JPEG quality 78. The five files total 62,405 bytes. CSS crops their display into small decorative cards; the source pictures and playable puzzles retain the complete images.
 

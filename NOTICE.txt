@@ -26,7 +26,6 @@ Bundled SVG assets in assets/:
   360_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   auto_stories_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   bolt_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
-  bookmark_star_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   border_style_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   camera_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   close_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
@@ -38,31 +37,22 @@ Bundled SVG assets in assets/:
   drag_pan_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   edit_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   explore_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
-  extension_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   frame_inspect_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
-  grid_guides_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   home_pin_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   kid_star_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   leaderboard_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   money_bag_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   money_off_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   pause_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
-  pediatrics_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   play_arrow_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   preview_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   rotate_left_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   rotate_right_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
-  save_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   school_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
-  sentiment_dissatisfied_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   social_leaderboard_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
-  star_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
-  stars_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
-  support_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   timer_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   trophy_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   upload_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
-  verified_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   visibility_off_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
   waving_hand_24dp_FFFFFF_FILL0_wght400_GRAD0_opsz24.svg
 

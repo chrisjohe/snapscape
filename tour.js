@@ -77,7 +77,7 @@ export function createHelpTour({ steps, onStep, onAction, onClose, onEscape, onL
   const options = { signal: controller.signal };
   let index = 0, targets = [], frame = 0, closed = false, excluded = [];
   const elements = (selectors) => selectors.flatMap((selector) => [...document.querySelectorAll(selector)]);
-  const allowed = () => [root, ...elements(["#announcement", ...(steps[index].allow || [])])];
+  const allowed = () => [root, ...elements(["#announcement", "#toast", ...(steps[index].allow || [])])];
   const canUse = (target) => allowed().some((element) => element.contains(target));
   const restoreAccess = () => {
     for (const element of excluded) element.inert = false;

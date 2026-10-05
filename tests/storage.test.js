@@ -1,183 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { createContext, Script } from "node:vm";
 import * as engine from "../engine.js";
 import { helpSteps } from "../tour.js";
+import { app, KEY, savedProgress } from "./helpers/app.js";
 
-const KEY = "snapscape.v1";
-const source = readFileSync(new URL("../app.js", import.meta.url), "utf8")
-  .replace(/^import \{[\s\S]*?\} from "[^"\n]+";\n/gm, "");
-const script = new Script(source, { filename: "app.js" });
-function savedProgress() {
-  return {
-    version: 1,
-    revision: "saved-revision",
-    active: {
-      id: "active-puzzle", name: "Unfinished memory", difficulty: "breezy",
-      ratio: 1.5, seconds: 30, seed: 123, image: "data:image/jpeg;base64,AAAA",
-      order: Array.from({ length: 24 }, (_, i) => i), pieces: Array(24).fill(null),
-    },
-    records: [{
-      id: "finished-puzzle", name: "Finished memory", difficulty: "breezy",
-      seconds: 60, points: engine.score("breezy", 60).total,
-      date: "2026-10-01T12:00:00Z", thumbnail: null,
-    }],
-  };
-}
-
-// Exercise the real app handlers with in-memory storage and minimal DOM stubs.
-// Measurements are supplied explicitly; no browser rendering or native picker is used.
-function app(storage = new Map([[KEY, JSON.stringify(savedProgress())]])) {
-  const nodes = new Map(), blobs = [], revoked = [], intervals = [];
-  let now = 1000;
-  let document;
-  class Node {
-    constructor(id = "") {
-      this.id = id;
-      this.hidden = false;
-      this.open = false;
-      this.value = "";
-      this.textContent = "";
-      this.innerHTML = "";
-      this.dataset = {};
-      this.attributes = new Map();
-      this.listeners = new Map();
-      this.style = { setProperty(name, value) { this[name] = String(value); } };
-      this.clientWidth = 600;
-      this.rect = { left: 0, top: 0, width: 0, height: 0 };
-      this.computedStyle = { columnGap: "16px", rowGap: "12px" };
-      const classes = new Set();
-      this.classList = {
-        add: (...names) => names.forEach((name) => classes.add(name)),
-        remove: (...names) => names.forEach((name) => classes.delete(name)),
-        toggle: (name, on) => on ? classes.add(name) : classes.delete(name),
-      };
-    }
-    addEventListener(type, fn, options = {}) {
-      if (!this.listeners.has(type)) this.listeners.set(type, []);
-      const listener = options.once ? (...args) => {
-        this.listeners.set(type, this.listeners.get(type).filter((entry) => entry !== listener));
-        return fn(...args);
-      } : fn;
-      this.listeners.get(type).push(listener);
-    }
-    emit(type, detail = {}) {
-      const event = { target: this, preventDefault() {}, ...detail };
-      const handlers = [...(this.listeners.get(type) || [])];
-      if (this[`on${type}`]) handlers.push(this[`on${type}`]);
-      return Promise.all(handlers.map((fn) => fn(event)));
-    }
-    click() { return this.emit("click"); }
-    focus() { document.activeElement = this; }
-    select() {}
-    setCustomValidity(message) { this.validationMessage = message; }
-    reportValidity() { return !this.validationMessage; }
-    get innerHTML() { return this.html || ""; }
-    set innerHTML(value) {
-      if (this.id === "modal-content") {
-        for (const [, id] of this.innerHTML.matchAll(/id="([^"]+)"/g)) {
-          nodes.delete(`#${id}`);
-        }
-      }
-      this.html = value;
-    }
-    setAttribute(name, value) { this.attributes.set(name, String(value)); }
-    getAttribute(name) { return this.attributes.get(name) ?? null; }
-    removeAttribute(name) { this.attributes.delete(name); }
-    contains(node) { return this === node; }
-    getBoundingClientRect() { return this.rect; }
-    showModal() { this.open = true; }
-    close() {
-      if (!this.open) return;
-      this.open = false;
-      return this.emit("close");
-    }
-    scrollTo() {}
-    hasPointerCapture() { return false; }
-    append() {}
-    remove() {}
-  }
-  function node(selector) {
-    if (!nodes.has(selector)) nodes.set(selector, new Node(selector.slice(1)));
-    return nodes.get(selector);
-  }
-  const navigation = ["play", "gallery", "achievements"].map((view) => {
-    const button = node(`[data-view="${view}"]`);
-    button.dataset.view = view;
-    return button;
-  });
-  const zoomButtons = [0.5, 0.75, 1, 1.25, 1.5, 2].map((zoom) => {
-    const button = node(`[data-zoom="${zoom}"]`);
-    button.dataset.zoom = String(zoom);
-    return button;
-  });
-  document = Object.assign(new Node(), {
-    activeElement: null,
-    querySelector: node,
-    querySelectorAll: (selector) => selector === "[data-view]"
-      ? navigation
-      : selector === ".view"
-        ? ["play", "gallery", "achievements"].map((view) => node(`#${view}-view`))
-        : selector === "[data-zoom]" ? zoomButtons : [],
-    createElement: () => new Node(),
-    body: new Node(),
-  });
-  node("#options-panel").hidden = true;
-  node("#zoom-panel").hidden = true;
-  node("#zoom-control").contains = (target) => zoomButtons.includes(target) || [
-    "#zoom-control", "#zoom-button", "#zoom-panel",
-  ].some((selector) => node(selector) === target);
-  node("#footer-options").contains = (target) => [
-    "#footer-options", "#options-toggle", "#options-panel", "#export-button",
-    "#import-button", "#erase-button",
-  ].some((selector) => node(selector) === target);
-  const window = Object.assign(new Node(), {
-    innerWidth: 1280, innerHeight: 900, scrollY: 0,
-    matchMedia: () => Object.assign(new Node(), { matches: false }),
-    scrollTo() {},
-  });
-  const localStorage = {
-    getItem: (key) => storage.get(key) ?? null,
-    setItem: (key, value) => storage.set(key, value),
-    removeItem: (key) => storage.delete(key),
-  };
-  const context = createContext({
-    ...engine, helpSteps, document, window, localStorage, Blob, atob,
-    // Drive the app's real tour callbacks without browser rendering.
-    createHelpTour(config) {
-      let index = 0;
-      config.onStep(config.steps[index]);
-      return {
-        close: config.onClose, refresh() {},
-        get step() { return config.steps[index]; },
-        go(id) {
-          index = config.steps.findIndex((step) => step.id === id);
-          assert.ok(index >= 0, `Unknown tour step: ${id}`);
-          config.onStep(config.steps[index]);
-        },
-        action: config.onAction,
-        escape: config.onEscape,
-      };
-    },
-    getComputedStyle: (node) => node.computedStyle,
-    performance: { now: () => now },
-    URL: {
-      createObjectURL: (blob) => { blobs.push(blob); return "blob:test"; },
-      revokeObjectURL: (url) => revoked.push(url),
-    },
-    setTimeout: () => 1, clearTimeout() {},
-    setInterval: (fn) => { intervals.push(fn); return intervals.length; },
-    requestAnimationFrame: () => 1,
-    ResizeObserver: class { observe() {} },
-  });
-  script.runInContext(context);
-  return {
-    node, document, window, storage, localStorage, blobs, revoked, intervals,
-    advance: (milliseconds) => { now += milliseconds; },
-    run: (code) => new Script(code).runInContext(context),
-  };
-}
 
 test("practice moves, helpers, completion and autosave never modify saved memories or points", async () => {
   const a = app(), before = a.storage.get(KEY);
@@ -1084,7 +910,7 @@ test("a random picture keeps its identity through renaming, resume, completion, 
   await a.node("#sample-button").click();
   const sampleId = a.run("selectedPhoto.sampleId");
   assert.ok(engine.SAMPLE_SNAPSCAPES.includes(sampleId));
-  assert.equal(a.run("loadedSource"), `./assets/snapscape-${sampleId}.png`);
+  assert.equal(a.run("loadedSource"), `./assets/snapscape-${sampleId}.jpg`);
   await a.node("#edit-setup-name-button").click();
   a.node("#rename-input").value = "A completely different name";
   await a.node("#rename-form").emit("submit");
@@ -1567,6 +1393,8 @@ test("rotation buttons follow the selected outline through rotation, scrolling, 
     area = a.node(".table-area"),
     outline = a.node('#puzzle-board [data-piece="2"] .piece-outline');
   area.rect = { left: 40, top: 100 };
+  controls.rect = { left: 0, top: 0, width: 96, height: 44 };
+  a.node("#table-scroll").rect = { left: 40, top: 100, width: 1200, height: 780 };
   a.node(".tray-return-preview .piece-outline").rect = { left: 1000, top: 400, width: 100, height: 90 };
   a.run("game.rotations[2] = 0; selectPiece(2);");
   assert.equal(controls.style.left, "1010px");
@@ -1662,4 +1490,242 @@ test("Twist guide costs, completed rewards, gallery and backup restores agree", 
   assert.equal(restored.records.at(-1).twist, true);
   const expected = engine.achievementProgress(restored.records, restored).totalPoints;
   assert.equal(Number(a.node("#total-points").textContent), expected);
+});
+
+test("modern autosaves compare the small revision key without parsing the full payload", () => {
+  const a = app();
+  assert.equal(a.run("save()"), true);
+  a.run(`globalThis.parseCalls = 0;
+    const originalParse = JSON.parse;
+    JSON.parse = (...args) => { ++parseCalls; return originalParse(...args); };`);
+  assert.equal(a.run("save()"), true);
+  assert.equal(a.run("parseCalls"), 0);
+  assert.equal(a.storage.get(`${KEY}.revision`), a.run("data.revision"));
+});
+
+test("legacy saves, missing metadata and failed revision-key writes remain usable", () => {
+  for (const failure of ["none", "get", "set"]) {
+    const a = app();
+    const get = a.localStorage.getItem, set = a.localStorage.setItem;
+    a.localStorage.getItem = (key) => {
+      if (failure === "get" && key === `${KEY}.revision`) throw new Error("Denied metadata");
+      return get(key);
+    };
+    a.localStorage.setItem = (key, value) => {
+      if (failure === "set" && key === `${KEY}.revision`) throw new Error("Denied metadata");
+      return set(key, value);
+    };
+    assert.equal(a.run('data.active.name = "Still saved"; save()'), true, failure);
+    assert.equal(JSON.parse(a.storage.get(KEY)).active.name, "Still saved", failure);
+    assert.equal(a.run('data.active.name = "Saved again"; save()'), true, failure);
+    assert.equal(JSON.parse(a.storage.get(KEY)).active.name, "Saved again", failure);
+  }
+});
+
+test("stale revision metadata cannot hide a conflict written by a legacy tab", () => {
+  const a = app();
+  a.run("resumeSavedGame();");
+  const oldMetadata = a.storage.get(`${KEY}.revision`);
+  const external = JSON.parse(a.storage.get(KEY));
+  external.revision = "changed-revision";
+  external.active.name = "Other tab's puzzle";
+  const raw = JSON.stringify(external);
+  a.storage.set(KEY, raw);
+  assert.equal(a.storage.get(`${KEY}.revision`), oldMetadata);
+  assert.equal(a.run("save()"), false);
+  assert.equal(a.storage.get(KEY), raw);
+  assert.equal(a.run("game"), null);
+  assert.equal(a.run("data.active.name"), "Other tab's puzzle");
+});
+
+test("a failed revision-key write safely falls back to the saved payload", () => {
+  const a = app(), set = a.localStorage.setItem;
+  a.localStorage.setItem = (key, value) => {
+    if (key === `${KEY}.revision` && value) throw new Error("Metadata quota");
+    return set(key, value);
+  };
+  assert.equal(a.run("save()"), true);
+  assert.equal(a.storage.has(`${KEY}.revision`), false);
+  const another = app(a.storage);
+  assert.equal(another.run('data.active.name = "Safe fallback"; save()'), true);
+  assert.equal(a.run("save()"), false);
+  assert.equal(JSON.parse(a.storage.get(KEY)).active.name, "Safe fallback");
+});
+
+test("a locked metadata key never prevents saving progress or detecting newer payloads", () => {
+  const a = app();
+  a.run("save();");
+  const metadata = a.storage.get(`${KEY}.revision`), set = a.localStorage.setItem;
+  a.localStorage.setItem = (key, value) => {
+    if (key === `${KEY}.revision`) throw new Error("Metadata denied");
+    return set(key, value);
+  };
+  a.localStorage.removeItem = () => { throw new Error("Metadata denied"); };
+  assert.equal(a.run('data.active.name = "Saved change"; save()'), true);
+  assert.equal(JSON.parse(a.storage.get(KEY)).active.name, "Saved change");
+  assert.equal(a.storage.get(`${KEY}.revision`), metadata);
+  assert.equal(a.run('data.active.name = "Another saved change"; save()'), true);
+  const external = app(a.storage);
+  assert.equal(external.run('data.active.name = "Changed elsewhere"; save()'), true);
+  assert.equal(a.run("save()"), false);
+  assert.equal(a.run("data.active.name"), "Changed elsewhere");
+});
+
+test("failed quota retries preserve in-memory thumbnails, revision and exported backup", async () => {
+  for (const prune of [false, true]) {
+    const saved = savedProgress();
+    saved.records[0].thumbnail = "data:image/jpeg;base64,AAAA";
+    const a = app(new Map([[KEY, JSON.stringify(saved)]]));
+    if (prune) a.run('data.records[0].thumbnail = "data:image/jpeg;base64," + "A".repeat(2000000);');
+    const thumbnail = a.run("data.records[0].thumbnail"), before = a.storage.get(KEY);
+    const revision = a.run("data.revision");
+    let writes = 0;
+    const set = a.localStorage.setItem;
+    a.localStorage.setItem = (key, value) => {
+      if (key === KEY) { ++writes; throw new Error("Quota exceeded"); }
+      return set(key, value);
+    };
+    assert.equal(a.run("save()"), false);
+    assert.equal(writes, prune ? 1 : 2);
+    assert.equal(a.run("data.records[0].thumbnail"), thumbnail);
+    assert.equal(a.run("data.revision"), revision);
+    assert.equal(a.storage.get(KEY), before);
+    await a.node("#export-button").click();
+    assert.equal(JSON.parse(await a.blobs.at(-1).text()).records[0].thumbnail, thumbnail);
+  }
+});
+
+test("a smaller quota retry commits cleared thumbnails only after the write succeeds", () => {
+  const saved = savedProgress();
+  saved.records[0].thumbnail = "data:image/jpeg;base64,AAAA";
+  const a = app(new Map([[KEY, JSON.stringify(saved)]])), set = a.localStorage.setItem;
+  a.localStorage.setItem = (key, value) => {
+    if (key === KEY && JSON.parse(value).records[0].thumbnail) throw new Error("Quota exceeded");
+    return set(key, value);
+  };
+  assert.equal(a.run("save()"), true);
+  assert.equal(a.run("data.records[0].thumbnail"), null);
+  assert.equal(JSON.parse(a.storage.get(KEY)).records[0].thumbnail, null);
+  assert.match(a.node("#toast").textContent, /scores are safe/);
+});
+
+test("idle autosaves adopt resume state without repeated toasts or collection renders", async () => {
+  const a = app();
+  const galleryWrites = a.node("#gallery-content").innerHTMLWrites;
+  const achievementWrites = a.node("#achievement-content").innerHTMLWrites;
+  const toast = a.node("#toast").textContent;
+  for (let i = 1; i <= 3; ++i) {
+    const incoming = savedProgress();
+    incoming.revision = `autosave-${i}`;
+    incoming.active.seconds += i * 10;
+    const raw = JSON.stringify(incoming);
+    a.storage.set(KEY, raw);
+    await a.window.emit("storage", { key: KEY, newValue: raw });
+    assert.equal(a.run("data.active.seconds"), incoming.active.seconds);
+  }
+  assert.equal(a.node("#toast").textContent, toast);
+  assert.equal(a.node("#gallery-content").innerHTMLWrites, galleryWrites);
+  assert.equal(a.node("#achievement-content").innerHTMLWrites, achievementWrites);
+  a.run("resumeSavedGame();");
+  assert.equal(a.run("seconds()"), 60);
+});
+
+test("a tour opened from setup survives autosaves and adopts visible collection changes silently", async () => {
+  const a = app();
+  await a.node("#help-button").click();
+  const session = a.run("helpSession"), practice = a.run("game");
+  const incoming = savedProgress();
+  incoming.revision = "external-autosave";
+  incoming.active.seconds = 90;
+  incoming.records[0].name = "Updated trophy";
+  const raw = JSON.stringify(incoming);
+  a.storage.set(KEY, raw);
+  await a.window.emit("storage", { key: KEY, newValue: raw });
+  assert.equal(a.run("helpSession"), session);
+  assert.equal(a.run("game"), practice);
+  assert.match(a.node("#gallery-content").innerHTML, /Updated trophy/);
+  assert.doesNotMatch(a.node("#toast").textContent, /changed in another tab/);
+  a.run("helpTour.close(); resumeSavedGame();");
+  assert.equal(a.run("seconds()"), 90);
+});
+
+test("corrupt JSON and invalid records export the exact original save for recovery", async () => {
+  const invalid = savedProgress();
+  invalid.records[0].difficulty = "removed-difficulty";
+  for (const raw of ["{broken JSON", JSON.stringify(invalid)]) {
+    const a = app(new Map([[KEY, raw]]));
+    assert.equal(a.run("storageBlocked"), true);
+    assert.equal(a.run("save()"), false);
+    assert.equal(a.storage.get(KEY), raw);
+    await a.node("#export-button").click();
+    assert.equal(await a.blobs.at(-1).text(), raw);
+    assert.match(a.node("#toast").textContent, /original saved data.*recovery/);
+    assert.match(a.node("#storage-warning").textContent, /export the original data/);
+    a.run("loadImage = async () => ({});");
+    await a.node("#import-input").emit("change", {
+      target: { files: [{ size: 100, text: async () => JSON.stringify(savedProgress()) }], value: "" },
+    });
+    await a.node("#confirm-import").click();
+    assert.equal(a.run("storageBlocked"), false);
+    await a.node("#export-button").click();
+    assert.equal(JSON.parse(await a.blobs.at(-1).text()).records[0].id, "finished-puzzle");
+  }
+});
+
+test("invalid external progress remains recoverable through raw export", async () => {
+  const a = app(), raw = "invalid external JSON";
+  a.storage.set(KEY, raw);
+  await a.window.emit("storage", { key: KEY, newValue: raw });
+  assert.equal(a.run("storageBlocked"), true);
+  await a.node("#export-button").click();
+  assert.equal(await a.blobs.at(-1).text(), raw);
+});
+
+test("invalid JSON, invalid schema and oversized imports preserve current progress", async () => {
+  for (const file of [
+    { size: 10, text: async () => "{bad JSON" },
+    { size: 20, text: async () => '{"version":999}' },
+    { size: 6000001, text: () => { throw new Error("Oversized file must not be read"); } },
+  ]) {
+    const a = app(), before = a.storage.get(KEY), dataBefore = a.run("JSON.stringify(data)");
+    await a.node("#import-input").emit("change", { target: { files: [file], value: "" } });
+    assert.equal(a.storage.get(KEY), before);
+    assert.equal(a.run("JSON.stringify(data)"), dataBefore);
+    assert.equal(a.node("#modal").open, false);
+    assert.ok(a.node("#toast").textContent);
+  }
+});
+
+test("failed backup restoration keeps current memories and reports the error inside the open dialog", async () => {
+  const a = app(), before = a.storage.get(KEY), dataBefore = a.run("JSON.stringify(data)");
+  const backup = { ...savedProgress(), active: null };
+  backup.records[0].name = "Replacement memory";
+  await a.node("#import-input").emit("change", {
+    target: { files: [{ size: 100, text: async () => JSON.stringify(backup) }], value: "" },
+  });
+  const set = a.localStorage.setItem;
+  a.localStorage.setItem = (key, value) => {
+    if (key === KEY) throw new Error("Quota exceeded");
+    return set(key, value);
+  };
+  await a.node("#confirm-import").click();
+  assert.equal(a.storage.get(KEY), before);
+  assert.equal(a.run("JSON.stringify(data)"), dataBefore);
+  assert.equal(a.node("#modal").open, true);
+  assert.equal(a.node("#import-error").hidden, false);
+  assert.match(a.node("#import-error").textContent, /current memories have been kept/);
+  assert.match(a.node("#modal-content").innerHTML, /id="import-error" role="alert"/);
+});
+
+test("erase also removes the revision key and storage.clear events reset the local state", async () => {
+  const a = app();
+  a.run("save();");
+  await a.node("#erase-button").click();
+  await a.node("#confirm-erase").click();
+  assert.equal(a.storage.has(`${KEY}.revision`), false);
+  const b = app();
+  b.storage.clear();
+  await b.window.emit("storage", { key: null, newValue: null });
+  assert.equal(b.run("data.records.length"), 0);
+  assert.equal(b.run("data.active"), null);
 });

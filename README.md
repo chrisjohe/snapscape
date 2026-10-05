@@ -4,6 +4,10 @@ A sunny photo jigsaw game, made for a gator at heart. Turn a favorite picture in
 
 A free, non-commercial hobby project by Christian J. Heinze, created for fun and personal learning.
 
+Current release: **1.0.1**. This maintenance release improves puzzle shape variety, saving and backup recovery, multi-tab behavior, puzzle completion, keyboard focus, notifications, and rendering performance. Bundled sample pictures now use smaller JPEG files at the original resolution. “See You Later, Alligator” keeps its existing behavior.
+
+Existing saved puzzles remain resumable; their piece outlines change to the improved seeded shapes.
+
 ## License and credits
 
 Copyright © 2026 Christian J. Heinze.

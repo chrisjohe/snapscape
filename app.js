@@ -22,10 +22,11 @@ import {
   ACHIEVEMENTS,
   SAMPLE_SNAPSCAPES,
   validateData,
-} from "./engine.js?v=20261002-21";
-import { helpSteps, createHelpTour } from "./tour.js?v=20261002-23";
+} from "./engine.js?v=1.0.1";
+import { helpSteps, createHelpTour } from "./tour.js?v=1.0.1";
 const $ = (s) => document.querySelector(s),
-  KEY = "snapscape.v1";
+  KEY = "snapscape.v1",
+  REVISION_KEY = `${KEY}.revision`;
 const PUZZLE_TITLES = [
   "A little Florida sunshine",
   "Gator state of mind",
@@ -86,6 +87,7 @@ let data = emptyData(),
   importToken = 0,
   photoLoading = false,
   storageBlocked = false,
+  unreadableSave = null,
   gameImageUrl = null,
   panMode = false,
   zoomLevel = 1,
@@ -104,9 +106,19 @@ const announce = (message) => {
 };
 function toast(message) {
   clearTimeout(toastTimeout);
-  $("#toast").textContent = message;
-  $("#toast").hidden = false;
-  toastTimeout = setTimeout(() => ($("#toast").hidden = true), 5500);
+  const notification = $("#toast"),
+    dialog = [$("#modal"), $("#about-dialog")].find((element) => element.open);
+  // Modal dialogs live in the top layer and make their outside siblings inert.
+  // Keep the status inside the open dialog so a failed restore is visible, too.
+  (dialog || document.body).append(notification);
+  notification.textContent = message;
+  notification.hidden = false;
+  toastTimeout = setTimeout(() => { notification.hidden = true; }, 5500);
+}
+for (const dialog of [$("#modal"), $("#about-dialog")]) {
+  dialog.addEventListener("close", () => {
+    if (dialog.contains($("#toast"))) document.body.append($("#toast"));
+  });
 }
 function storageWarning(message) {
   $("#storage-warning").textContent = message;
@@ -114,11 +126,13 @@ function storageWarning(message) {
 }
 try {
   const raw = localStorage.getItem(KEY);
+  unreadableSave = raw;
   if (raw) data = validateData(JSON.parse(raw));
+  unreadableSave = null;
 } catch {
   storageBlocked = true;
   storageWarning(
-    "Saved data could not be opened. You can still play, but changes cannot be saved. Restore a Snapscape backup to recover your progress.",
+    "Saved data could not be opened. You can still play, but changes cannot be saved. Use “Back up memories” to export the original data for recovery, or restore a working Snapscape backup.",
   );
 }
 function seconds() {
@@ -128,45 +142,61 @@ function captureTime() {
   if (helpSession) return;
   if (game) game.seconds = seconds();
 }
+function storedRevision(raw) {
+  if (!raw) return "";
+  let revision;
+  try { revision = localStorage.getItem(REVISION_KEY); } catch {}
+  // Current saves put revision last. Check the small key against that suffix so
+  // legacy writers or a failed metadata write cannot hide a conflict.
+  if (revision && raw.endsWith(`"revision":${JSON.stringify(revision)}}`)) {
+    return revision;
+  }
+  return JSON.parse(raw).revision ?? "";
+}
+function writeStoredData(value, raw = JSON.stringify(value)) {
+  // The payload is authoritative. A failed auxiliary-key write is harmless:
+  // storedRevision checks the payload suffix before trusting cached metadata.
+  localStorage.setItem(KEY, raw);
+  try { localStorage.setItem(REVISION_KEY, value.revision); } catch {}
+}
 function save() {
   if (helpSession) return true;
   captureTime();
   if (storageBlocked) return false;
   try {
     const stored = localStorage.getItem(KEY);
-    if ((stored ? (JSON.parse(stored).revision ?? "") : "") !== data.revision) {
+    if (storedRevision(stored) !== data.revision) {
       adoptExternal(stored);
       return false;
     }
     // Leave erased storage empty until the user creates or restores progress.
     if (!data.active && !data.records.length && !data.revision) return true;
-    const previousRevision = data.revision;
-    data.revision = randomId();
-    let raw = JSON.stringify(data);
+    // Prune a candidate, keeping all in-memory thumbnails available for backup
+    // when both the regular write and its smaller retry fail.
+    const candidate = { ...data, records: data.records.map((record) => ({ ...record })), revision: randomId() };
+    let raw = JSON.stringify(candidate);
     while (raw.length > 1900000) {
-      const old = data.records.find((r) => r.thumbnail);
+      const old = candidate.records.find((record) => record.thumbnail);
       if (!old) break;
       old.thumbnail = null;
-      raw = JSON.stringify(data);
+      raw = JSON.stringify(candidate);
     }
+    let clearedThumbnails = false;
     try {
-      localStorage.setItem(KEY, raw);
+      writeStoredData(candidate, raw);
     } catch (error) {
-      const thumbs = data.records.filter((r) => r.thumbnail);
-      if (!thumbs.length) {
-        data.revision = previousRevision;
-        throw error;
-      }
+      const thumbs = candidate.records.filter((record) => record.thumbnail);
+      if (!thumbs.length) throw error;
       for (const record of thumbs) record.thumbnail = null;
-      try {
-        localStorage.setItem(KEY, JSON.stringify(data));
-      } catch (retryError) {
-        data.revision = previousRevision;
-        throw retryError;
-      }
-      toast(
-        "Your scores are safe. Older thumbnails were cleared to make room.",
-      );
+      writeStoredData(candidate);
+      clearedThumbnails = true;
+    }
+    data.revision = candidate.revision;
+    for (let i = 0; i < data.records.length; ++i) {
+      data.records[i].thumbnail = candidate.records[i].thumbnail;
+    }
+    if (clearedThumbnails) {
+      toast("Your scores are safe. Older thumbnails were cleared to make room.");
     }
     $("#storage-warning").hidden = true;
     return true;
@@ -178,33 +208,52 @@ function save() {
   }
 }
 function adoptExternal(raw) {
-  helpTour?.close();
   try {
     if (!raw) {
       resetBrowserProgress();
       toast("Snapscape data was erased in another tab.");
       return;
     }
-    data = validateData(JSON.parse(raw));
-    game = null;
-    drag = null;
-    paused = true;
-    selected = null;
-    $("#game").hidden = true;
-    $("#setup").hidden = false;
-    updateAll();
-    toast(
-      "Progress changed in another tab. Your latest saved puzzle is ready to resume.",
-    );
+    const incoming = validateData(JSON.parse(raw));
+    const interrupted = Boolean(helpSession ? helpSession.game : game);
+    if (interrupted) helpTour?.close();
+    const visibleProgressChanged =
+      JSON.stringify(data.records) !== JSON.stringify(incoming.records) ||
+      data.guideUsed !== incoming.guideUsed ||
+      data.guideExhausted !== incoming.guideExhausted ||
+      data.active?.id !== incoming.active?.id ||
+      data.active?.name !== incoming.active?.name;
+    data = incoming;
+    storageBlocked = false;
+    unreadableSave = null;
+    $("#storage-warning").hidden = true;
+    if (interrupted) {
+      game = null;
+      drag = null;
+      paused = true;
+      selected = null;
+      $("#game").hidden = true;
+      $("#setup").hidden = false;
+      updateAll();
+      toast(
+        "Progress changed in another tab. Your latest saved puzzle is ready to resume.",
+      );
+    } else if (visibleProgressChanged) {
+      // Autosaves only update the resume data. Rebuild the collection only when
+      // its visible content changes, and leave a setup-only tour undisturbed.
+      updateAll();
+    }
   } catch {
+    unreadableSave = raw;
     storageWarning(
-      "Another tab changed the saved data. Please reload before continuing.",
+      "Another tab saved data that could not be opened. Use “Back up memories” to export the original data for recovery, or restore a working backup.",
     );
     storageBlocked = true;
   }
 }
 window.addEventListener("storage", (e) => {
-  if (e.key === KEY) adoptExternal(e.newValue);
+  if (e.storageArea && e.storageArea !== localStorage) return;
+  if (e.key === KEY || e.key === null) adoptExternal(e.newValue);
 });
 $("#difficulty-options").innerHTML = DIFFICULTIES.map(
   (d) =>
@@ -346,7 +395,7 @@ async function useSample() {
   const sampleId = SAMPLE_SNAPSCAPES[Math.floor(Math.random() * SAMPLE_SNAPSCAPES.length)];
   setPhotoLoading(true);
   try {
-    const photo = await prepareImage(`./assets/snapscape-${sampleId}.png`);
+    const photo = await prepareImage(`./assets/snapscape-${sampleId}.jpg`);
     if (token !== loadToken) return;
     showPhoto({ ...photo, ownPhoto: false, sampleId });
   } catch (error) {
@@ -731,7 +780,21 @@ $(".brand").addEventListener("click", (e) => {
   e.preventDefault();
   switchView("play", { showSetup: true });
 });
+const renderedPieces = new WeakMap();
+let boardRender = null, trayRender = null;
 function pieceMarkup(id, prefix) {
+  let cache = renderedPieces.get(game);
+  if (!cache || cache.image !== gameImageUrl) {
+    cache = { image: gameImageUrl, pieces: new Map() };
+    renderedPieces.set(game, cache);
+  }
+  const key = `${prefix}-${id}-${pieceRotation(game, id)}`;
+  if (cache.pieces.has(key)) return cache.pieces.get(key);
+  const markup = buildPieceMarkup(id, prefix);
+  cache.pieces.set(key, markup);
+  return markup;
+}
+function buildPieceMarkup(id, prefix) {
   const { w, h, cw, ch } = geometry(game),
     t = target(game, id),
     path = piecePath(game, id),
@@ -746,7 +809,24 @@ function renderGame() {
   updateRotationControl();
   helpTour?.refresh();
 }
+function updateBoardSelection() {
+  for (const piece of game.pieces) {
+    if (piece) $(`#puzzle-board [data-piece="${piece.id}"]`)?.classList.toggle("selected", selected === piece.id);
+  }
+  const cursor = $("#keyboard-cursor"), { cw, ch } = geometry(game), t = target(game, keyboardCell);
+  cursor.setAttribute("visibility", selected === null ? "hidden" : "visible");
+  cursor.setAttribute("x", t.x + 2);
+  cursor.setAttribute("y", t.y + 2);
+  cursor.setAttribute("width", cw - 4);
+  cursor.setAttribute("height", ch - 4);
+  $("#guide-image")?.setAttribute("opacity", showGuide ? ".4" : "0");
+}
 function renderBoard() {
+  const signature = JSON.stringify(game.pieces.map((p, id) => p && [p.id, p.x, p.y, p.locked, pieceRotation(game, id)]));
+  if (boardRender?.game === game && boardRender.image === gameImageUrl && boardRender.signature === signature) {
+    updateBoardSelection();
+    return;
+  }
   const { w, h, cw, ch, cols, rows } = geometry(game),
     margin = BOARD_MARGIN,
     board = $("#puzzle-board");
@@ -765,11 +845,10 @@ function renderBoard() {
     ...game.pieces.filter((p) => p && !p.locked),
   ])
     markup += `<g class="board-piece ${p.locked ? "locked" : ""} ${selected === p.id ? "selected" : ""}" data-piece="${p.id}" ${p.locked ? "" : 'tabindex="0" role="button"'} transform="translate(${p.x},${p.y})" aria-label="${p.locked ? "Placed" : "Loose"} piece ${p.id + 1}">${pieceMarkup(p.id, "board")}</g>`;
-  if (selected !== null) {
-    const t = target(game, keyboardCell);
-    markup += `<rect id="keyboard-cursor" x="${t.x + 2}" y="${t.y + 2}" width="${cw - 4}" height="${ch - 4}" fill="none" stroke="#bd4b23" stroke-width="3" stroke-dasharray="10 6" pointer-events="none"/>`;
-  }
+  markup += `<rect id="keyboard-cursor" visibility="hidden" fill="none" stroke="#bd4b23" stroke-width="3" stroke-dasharray="10 6" pointer-events="none"/>`;
   board.innerHTML = markup;
+  boardRender = { game, image: gameImageUrl, signature };
+  updateBoardSelection();
 }
 function trayPieceSvg(id, prefix) {
   const { cw, ch } = geometry(game),
@@ -781,6 +860,16 @@ function renderTray() {
   const ids = game.order.filter(
     (id) => !game.pieces[id] && (!onlyEdges || edges(game, id).includes(0)),
   );
+  const signature = ids.map((id) => `${id}:${pieceRotation(game, id)}`).join(",") + `:${onlyEdges}`;
+  if (trayRender?.game === game && trayRender.image === gameImageUrl && trayRender.signature === signature) {
+    for (const id of ids) {
+      const button = $(`#piece-tray [data-piece="${id}"]`);
+      button?.classList.toggle("selected", selected === id);
+      button?.setAttribute("aria-pressed", String(selected === id));
+    }
+    updateTrayReturnState();
+    return;
+  }
   $("#piece-tray").innerHTML =
     ids
       .map(
@@ -789,6 +878,7 @@ function renderTray() {
       )
       .join("") ||
     `<p style="grid-column:1/-1;padding:16px;font-size:14px;line-height:1.5">${onlyEdges ? "All edge pieces are on the table. Turn off “Edge pieces” to see the rest." : "All pieces are on the table. Keep joining them together!"}</p>`;
+  trayRender = { game, image: gameImageUrl, signature };
   updateTrayReturnState();
 }
 function updateTrayReturnState() {
@@ -819,11 +909,22 @@ function positionRotationControls() {
     : $(".tray-return-preview .piece-outline");
   if (!outline) return;
   const piece = outline.getBoundingClientRect(),
-    area = $(".table-area").getBoundingClientRect();
-  controls.style.left = `${piece.left + piece.width / 2 - area.left}px`;
-  controls.style.top = `${piece.top - area.top - 12}px`;
+    area = $(".table-area").getBoundingClientRect(),
+    table = $("#table-scroll").getBoundingClientRect(),
+    header = $(".site-header").getBoundingClientRect(),
+    tools = controls.getBoundingClientRect(),
+    left = Math.max(table.left, 0) + 8,
+    right = Math.min(table.left + table.width, window.innerWidth) - 8,
+    top = Math.max(table.top, header.top + header.height, 0) + 8,
+    bottom = Math.min(table.top + table.height, window.innerHeight) - 8,
+    clamp = (value, min, max) => Math.max(min, Math.min(value, Math.max(min, max)));
+  controls.style.visibility = right - left < tools.width || bottom - top < tools.height ? "hidden" : "";
+  if (controls.style.visibility) return;
+  controls.style.left = `${clamp(piece.left + piece.width / 2, left + tools.width / 2, right - tools.width / 2) - area.left}px`;
+  controls.style.top = `${clamp(piece.top - 12, top + tools.height, bottom) - area.top}px`;
 }
 $("#table-scroll").addEventListener("scroll", positionRotationControls, { passive: true });
+document.addEventListener("scroll", positionRotationControls, { passive: true });
 async function rotateSelectedPiece(turns = 1) {
   if (!game?.twist || paused || selected === null || drag || panMode) return;
   const id = selected, count = rotateGroup(game, id, turns);
@@ -1269,7 +1370,9 @@ function scoreReels(points) {
   }).join("");
   return `<span class="sr-only">+${safe(formatted)}</span><span class="score-reels" aria-hidden="true"><span class="score-plus">+</span>${characters}</span>`;
 }
+let completingGame = null;
 async function completeGame() {
+  if (!game || completingGame === game) return;
   if (helpSession) {
     announce("Practice puzzle complete. Nice snapping! Your memories and points are unchanged.");
     return;
@@ -1278,51 +1381,65 @@ async function completeGame() {
   elapsed = game.seconds;
   paused = true;
   tick();
-  const completed = game,
-    previously = achievementProgress(data.records, data).earned,
-    award = score(completed.difficulty, completed.seconds, completed.guideUses, completed.twist);
-  let thumbnail = null;
+  const completed = game;
+  completingGame = completed;
   try {
-    thumbnail = (await prepareImage(completed.image, 260, 0.6)).image;
-  } catch {}
-  if (game !== completed) return;
-  if (!data.records.some((r) => r.id === completed.id))
-    data.records.push({
-      id: completed.id,
-      name: completed.name,
-      difficulty: completed.difficulty,
-      seconds: completed.seconds,
-      points: award.total,
-      guideUses: completed.guideUses || 0,
-      twist: completed.twist === true,
-      date: new Date().toISOString(),
-      thumbnail,
-      resumed: completed.resumed,
-      ownPhoto: completed.ownPhoto,
-      sampleId: completed.sampleId ?? null,
-    });
-  data.active = null;
-  game = null;
-  resetPhoto();
-  save();
-  const unlocks = achievementProgress(data.records, data).earned.filter(
-    (a) => !previously.includes(a),
-  );
-  const achievementBonus = unlocks.reduce((sum, a) => sum + a.points, 0);
-  const totalAward = award.total + achievementBonus;
-  updateAll();
-  $("#game").hidden = true;
-  $("#setup").hidden = false;
-  showCompletion({ completed, award, unlocks, achievementBonus, totalAward });
-  announce(`Puzzle complete! You earned ${totalAward.toLocaleString()} Snap Points.${achievementBonus ? ` Includes ${achievementBonus.toLocaleString()} achievement bonus points.` : ""}`);
+    const completionData = data,
+      previously = achievementProgress(data.records, data).earned,
+      award = score(completed.difficulty, completed.seconds, completed.guideUses, completed.twist);
+    let thumbnail = null;
+    try {
+      thumbnail = (await prepareImage(completed.image, 260, 0.6)).image;
+    } catch {}
+    if (game !== completed) return;
+    if (!data.records.some((r) => r.id === completed.id))
+      data.records.push({
+        id: completed.id,
+        name: completed.name,
+        difficulty: completed.difficulty,
+        seconds: completed.seconds,
+        points: award.total,
+        guideUses: completed.guideUses || 0,
+        twist: completed.twist === true,
+        date: new Date().toISOString(),
+        thumbnail,
+        resumed: completed.resumed,
+        ownPhoto: completed.ownPhoto,
+        sampleId: completed.sampleId ?? null,
+      });
+    data.active = null;
+    game = null;
+    resetPhoto();
+    const saved = save();
+    // A conflict adopts the other tab's state. Do not advertise discarded rewards.
+    if (data !== completionData) {
+      $("#game").hidden = true;
+      $("#setup").hidden = false;
+      toast("Progress changed in another tab. This finish could not be saved. Your latest saved puzzle is ready to resume.");
+      return;
+    }
+    const unlocks = achievementProgress(data.records, data).earned.filter(
+      (a) => !previously.includes(a),
+    );
+    const achievementBonus = unlocks.reduce((sum, a) => sum + a.points, 0);
+    const totalAward = award.total + achievementBonus;
+    updateAll();
+    $("#game").hidden = true;
+    $("#setup").hidden = false;
+    showCompletion({ completed, award, unlocks, achievementBonus, totalAward, saved });
+    announce(`Puzzle complete! You earned ${totalAward.toLocaleString()} Snap Points.${achievementBonus ? ` Includes ${achievementBonus.toLocaleString()} achievement bonus points.` : ""}${saved ? "" : " These rewards are only in this tab. Back up your memories before closing it."}`);
+  } finally {
+    if (completingGame === completed) completingGame = null;
+  }
 }
-function showCompletion({ completed, award, unlocks, achievementBonus, totalAward }) {
+function showCompletion({ completed, award, unlocks, achievementBonus, totalAward, saved = true }) {
   function showWin(returning = false) {
     modal(
       `<div class="win${returning ? " win-returned" : ""}">
       <img class="win-mascot" src="./assets/gator-celebrate.png" alt="" width="128" height="128" aria-hidden="true">
       <h2 id="win-title"><span class="sr-only">Well snapped!</span><span class="win-title-letters" aria-hidden="true">${Array.from("Well snapped!", (character, index) => `<span class="win-title-letter" style="--letter-index: ${index}">${safe(character)}</span>`).join("")}</span></h2>
       <p class="win-memory">“${safe(completed.name)}” is headed to the Trophy Swamp.</p>
+      ${saved ? "" : '<p role="alert">These rewards could not be saved in this browser. Keep this tab open and use “Back up memories” before closing it.</p>'}
       <div class="win-reward">
         <div class="win-score">${scoreReels(totalAward)}<img class="win-coin" src="./assets/snap-coin.png" alt="Snap Points" width="48" height="48"></div>
         <button class="button secondary guide-button win-stats-button" id="win-stats-button" type="button"><span class="toolbar-icon icon-leaderboard" aria-hidden="true"></span><span>Stats</span></button>
@@ -1515,7 +1632,7 @@ $("#achievement-content").addEventListener("keydown", (event) => {
   }
 });
 const PRACTICE_PHOTO = {
-  image: "./assets/snapscape-beach.png", ratio: 4 / 3, ownPhoto: false, sampleId: "beach",
+  image: "./assets/snapscape-beach.jpg", ratio: 4 / 3, ownPhoto: false, sampleId: "beach",
 };
 function practicePuzzle(twist) {
   return {
@@ -1624,6 +1741,10 @@ function finishHelpTour() {
 }
 function startHelpTour() {
   if (helpSession) return;
+  if (completingGame === game && game) {
+    toast("Finishing your puzzle… Try How to play again in a moment.");
+    return;
+  }
   if (photoLoading) {
     toast("Your photo is still getting ready. Try How to play in a moment.");
     return;
@@ -1713,18 +1834,23 @@ aboutDialog.addEventListener("click", (event) => {
 $("#export-button").addEventListener("click", () => {
   setOptionsOpen(false, true);
   captureTime();
-  const blob = new Blob([JSON.stringify(data, null, 2)], {
+  const recovery = unreadableSave !== null;
+  const blob = new Blob([recovery ? unreadableSave : JSON.stringify(data, null, 2)], {
       type: "application/json",
     }),
     url = URL.createObjectURL(blob),
     link = document.createElement("a");
   link.href = url;
-  link.download = `snapscape-memories-${new Date().toISOString().slice(0, 10)}.json`;
+  link.download = `snapscape-${recovery ? "recovery" : "memories"}-${new Date().toISOString().slice(0, 10)}.json`;
   document.body.append(link);
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 20000);
-  toast("Your backup includes your Trophy Swamp, points, and saved puzzle.");
+  toast(recovery
+    ? "Your original saved data was exported for recovery. It may need repair before Snapscape can restore it."
+    : storageBlocked
+      ? "Your backup includes only the memories available in this tab. The browser’s saved data could not be read."
+      : "Your backup includes your Trophy Swamp, points, and saved puzzle.");
 });
 $("#import-button").addEventListener("click", () => {
   setOptionsOpen(false, true);
@@ -1747,16 +1873,17 @@ $("#import-input").addEventListener("change", async (e) => {
     if (game) pause();
     if (token !== importToken) return;
     modal(
-      `<p class="eyebrow">WELCOME BACK, MEMORIES</p><h2>Restore this backup?</h2><p>This backup has ${imported.records.length} finished puzzles${imported.active ? " and an unfinished puzzle" : ""}. Restoring will replace the memories currently saved in this browser. Back up your current memories first if you want to keep them.</p><div class="dialog-actions"><button class="button primary" id="confirm-import">Restore backup</button><button class="button secondary" id="cancel-import">Cancel</button></div>`,
+      `<p class="eyebrow">WELCOME BACK, MEMORIES</p><h2>Restore this backup?</h2><p>This backup has ${imported.records.length} finished puzzles${imported.active ? " and an unfinished puzzle" : ""}. Restoring will replace the memories currently saved in this browser. Back up your current memories first if you want to keep them.</p><p id="import-error" role="alert" hidden></p><div class="dialog-actions"><button class="button primary" id="confirm-import">Restore backup</button><button class="button secondary" id="cancel-import">Cancel</button></div>`,
     );
     $("#cancel-import").onclick = closeModal;
     $("#confirm-import").onclick = () => {
       if (token !== importToken) return;
       try {
         imported.revision = randomId();
-        localStorage.setItem(KEY, JSON.stringify(imported));
+        writeStoredData(imported);
         data = imported;
         storageBlocked = false;
+        unreadableSave = null;
         game = null;
         paused = true;
         drag = null;
@@ -1767,9 +1894,9 @@ $("#import-input").addEventListener("change", async (e) => {
         switchView("gallery");
         toast("Welcome back! Your memories have been restored.");
       } catch {
-        toast(
-          "There is not enough browser space to restore this backup. Your current memories have been kept.",
-        );
+        const error = $("#import-error");
+        error.textContent = "There is not enough browser space to restore this backup. Your current memories have been kept.";
+        error.hidden = false;
       }
     };
   } catch (error) {
@@ -1801,6 +1928,7 @@ function resetBrowserProgress() {
   $("#setup").hidden = false;
   $("#import-input").value = "";
   storageBlocked = false;
+  unreadableSave = null;
   $("#storage-warning").hidden = true;
   setOptionsOpen(false);
   closeModal();
@@ -1819,6 +1947,7 @@ $("#erase-button").addEventListener("click", () => {
   $("#confirm-erase").onclick = () => {
     try {
       localStorage.removeItem(KEY);
+      try { localStorage.removeItem(REVISION_KEY); } catch {}
     } catch {
       $("#erase-error").textContent =
         "This browser could not erase your Snapscape data. Your memories have been kept. Please try again.";

@@ -33,8 +33,7 @@ export const BOARD_MARGIN = 8;
 export function boardViewport({
   viewportHeight,
   tableTop,
-  mobile = false,
-  spaceBelow = mobile ? 210 : 54,
+  spaceBelow = 54,
   availableWidth = Infinity,
   frameRatio = 1,
   zoom = 1,
@@ -170,8 +169,15 @@ export function edges(game, id) {
   const { cols, rows } = geometry(game),
     r = Math.floor(id / cols),
     c = id % cols;
-  const hash = (n) =>
-    (Math.imul(n + game.seed, 2654435761) >>> 0) % 2 ? 1 : -1;
+  // Mix the seam index and seed before selecting a bit. Multiplying and using
+  // parity alone would alternate every seam and only let the seed flip them.
+  const hash = (n) => {
+    let value = (n + game.seed) | 0;
+    value = Math.imul(value ^ (value >>> 16), 0x85ebca6b);
+    value = Math.imul(value ^ (value >>> 13), 0xc2b2ae35);
+    value ^= value >>> 16;
+    return value >>> 31 ? 1 : -1;
+  };
   return [
     r === 0 ? 0 : -hash((r - 1) * cols + c),
     c === cols - 1 ? 0 : hash(1000 + r * cols + c),

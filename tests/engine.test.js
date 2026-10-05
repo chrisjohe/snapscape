@@ -38,8 +38,8 @@ function game(id = "breezy", ratio = 1.5) {
   };
 }
 test("every difficulty has complementary neighbors and flat outer edges", () => {
-  for (const d of DIFFICULTIES) {
-    const g = game(d.id);
+  for (const d of DIFFICULTIES) for (const seed of [0, 1, 123, 999999]) {
+    const g = { ...game(d.id), seed };
     for (let id = 0; id < g.pieces.length; id++) {
       const e = edges(g, id),
         c = id % d.cols,
@@ -52,6 +52,29 @@ test("every difficulty has complementary neighbors and flat outer edges", () => 
       if (r === 0) assert.equal(e[0], 0);
       assert.ok(!piecePath(g, id).includes("NaN"));
     }
+  }
+});
+test("seeded piece shapes are diverse, deterministic, and survive saving", () => {
+  for (const d of DIFFICULTIES) {
+    const patterns = [];
+    for (const seed of [0, 1, 2, 123, 999999]) {
+      const g = { ...game(d.id), seed };
+      const pattern = g.order.map((id) => edges(g, id));
+      const interiorShapes = new Set(pattern.filter((e) => !e.includes(0)).map((e) => e.join(",")));
+      assert.ok(interiorShapes.size >= 5, `${d.id}, seed ${seed}: varied interior shapes`);
+      assert.ok(pattern.some((e) => !e.includes(0) && e.includes(1) && e.includes(-1)));
+      const restored = validateData(JSON.parse(JSON.stringify({
+        version: 1, records: [], active: g,
+      }))).active;
+      assert.deepEqual(restored.order.map((id) => edges(restored, id)), pattern);
+      patterns.push(pattern);
+    }
+    // Adjacent seeds must change individual seams, beyond simply flipping the
+    // same checkerboard. Both retained and changed seams should be present.
+    const first = patterns[0].flat().filter((sign) => sign !== 0);
+    const second = patterns[1].flat().filter((sign) => sign !== 0);
+    assert.ok(first.some((sign, i) => sign === second[i]));
+    assert.ok(first.some((sign, i) => sign !== second[i]));
   }
 });
 test("a close piece locks exactly and a distant piece stays movable", () => {
